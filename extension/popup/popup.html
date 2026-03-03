@@ -5,80 +5,52 @@
     <title>X Article Curator</title>
     <style>
       body {
-        width: 360px;
-        max-height: 480px;
+        width: 340px;
         margin: 0;
-        padding: 12px;
+        padding: 14px;
         box-sizing: border-box;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont,
-          "SF Pro Text", sans-serif;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          sans-serif;
         background: #f9fafb;
         color: #111827;
       }
       h1 {
         font-size: 15px;
-        margin: 0 0 4px;
+        margin: 0 0 10px;
       }
-      p {
-        margin: 0;
-      }
-      .small {
-        font-size: 12px;
-        color: #4b5563;
-      }
-      .links {
-        margin-top: 12px;
+      .page-url {
+        margin-top: 10px;
+        padding: 10px;
         border-radius: 10px;
         background: #ffffff;
-        padding: 8px;
-        max-height: 340px;
-        overflow-y: auto;
         border: 1px solid #e5e7eb;
-      }
-      .link-row {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        padding: 6px 4px;
-        border-radius: 8px;
-      }
-      .link-row + .link-row {
-        border-top: 1px solid #f3f4f6;
-      }
-      .url {
         font-size: 12px;
         color: #111827;
         word-break: break-all;
+        line-height: 1.5;
       }
-      .tweet-url {
-        font-size: 11px;
-        color: #6b7280;
-        word-break: break-all;
-      }
-      .row-footer {
+      .actions {
+        margin-top: 10px;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        margin-top: 2px;
+        gap: 10px;
       }
       button {
-        padding: 4px 10px;
+        padding: 6px 14px;
         border-radius: 999px;
         border: none;
         cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-      }
-      .btn-primary {
+        font-size: 13px;
+        font-weight: 600;
         background: #111827;
         color: #f9fafb;
       }
-      .btn-primary[disabled] {
+      button:disabled {
         opacity: 0.6;
         cursor: default;
       }
       .status {
-        font-size: 11px;
+        font-size: 12px;
       }
       .status-ok {
         color: #059669;
@@ -89,19 +61,10 @@
       .status-error {
         color: #b91c1c;
       }
-      .empty {
-        font-size: 12px;
-        color: #6b7280;
-        padding: 8px 4px;
-      }
-      .error {
-        margin-top: 8px;
-        font-size: 12px;
-        color: #b91c1c;
-      }
       .config-hint {
-        margin-top: 8px;
+        margin-top: 10px;
         font-size: 12px;
+        color: #4b5563;
       }
       .link {
         color: #111827;
@@ -112,18 +75,17 @@
     </style>
   </head>
   <body>
-    <h1>X Article Curator</h1>
-    <p class="small">
-      Detected links from this page. Save them to your weekly reading list.
-    </p>
+    <h1>Save to Reading List</h1>
     <div id="config-hint" class="config-hint" hidden>
       API not configured. Open
       <span id="open-options" class="link">options</span>
-      and set the API URL and key.
+      to set the API URL and key.
     </div>
-    <div id="links" class="links"></div>
-    <div id="error" class="error" aria-live="polite"></div>
+    <div id="page-url" class="page-url"></div>
+    <div class="actions">
+      <button id="save-btn" disabled>Save</button>
+      <span id="status" class="status"></span>
+    </div>
     <script src="popup.js"></script>
   </body>
 </html>
-

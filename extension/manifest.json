@@ -1,25 +1,16 @@
 {
   "manifest_version": 3,
   "name": "X Article Curator",
-  "description": "Save article links from X / Twitter into a weekly reading list.",
-  "version": "0.1.0",
-  "permissions": ["storage", "tabs", "activeTab", "scripting"],
-  "host_permissions": ["https://x.com/*", "https://twitter.com/*"],
+  "description": "Save the current page to your weekly reading list.",
+  "version": "0.2.0",
+  "permissions": ["storage", "activeTab"],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
   "action": {
-    "default_title": "Save article links",
+    "default_title": "Save this page",
     "default_popup": "popup/popup.html"
   },
-  "options_page": "options/options.html",
-  "content_scripts": [
-    {
-      "matches": ["https://x.com/*", "https://twitter.com/*"],
-      "js": ["content/content.js"],
-      "run_at": "document_idle"
-    }
-  ]
+  "options_page": "options/options.html"
 }
-

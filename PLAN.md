@@ -2,12 +2,22 @@
 
 ## Context
 
-Browsing Twitter produces a stream of interesting articles that get lost in bookmarks. This tool gives you a dedicated space to save article links from Twitter, automatically extract their metadata, and review them grouped by week — turning a chaotic bookmark pile into a clean weekly reading list.
+Browsing Twitter/X produces a stream of interesting articles that get lost in bookmarks. You click a link in a tweet, land on the article, and want a quick way to save it. This tool gives you a Chrome extension to save the current page with one click, a backend that automatically extracts metadata (title, image, description), and a clean web app that shows your saved articles grouped by week.
+
+## How It Works
+
+1. You see a tweet with an interesting article link on X / Twitter.
+2. You click the link and open the article in your browser.
+3. You click the **X Article Curator** extension icon.
+4. The popup shows the current page URL and a **Save** button.
+5. You click Save — the extension sends the URL to the backend API.
+6. The server calls `unfurl.js` to extract Open Graph metadata (title, description, image, author, site name).
+7. The article is stored in SQLite and appears on the web app, grouped into the correct week.
 
 ## Architecture
 
 Two components:
-1. **Chrome Extension** — Runs on x.com/twitter.com. Detects external links in tweets, sends URLs to the backend API via a popup UI.
+1. **Chrome Extension** — Works on any page. Reads the current tab's URL and sends it to the backend API via a popup UI.
 2. **Next.js Web App** — Stores articles in SQLite, extracts metadata server-side using `unfurl.js`, and renders a weekly-grouped reading list.
 
 ## Tech Stack
@@ -15,12 +25,16 @@ Two components:
 - **Next.js 14+** (App Router, TypeScript, Tailwind CSS)
 - **SQLite** via `better-sqlite3` + **Drizzle ORM** (single-file DB, zero infrastructure)
 - **unfurl.js** for server-side Open Graph / Twitter Card metadata extraction
+- **date-fns** for week grouping calculations
 - **Chrome Extension** (Manifest V3)
 
 ## Project Structure
 
 ```
 x-article-curator/
+├── PLAN.md
+├── .gitignore
+│
 ├── web/                          # Next.js app
 │   ├── src/
 │   │   ├── app/
@@ -37,12 +51,12 @@ x-article-curator/
 │   │       ├── article-card.tsx
 │   │       ├── week-group.tsx
 │   │       └── article-list.tsx  # Server Component, queries DB directly
-│   └── drizzle.config.ts
+│   ├── drizzle.config.ts
+│   └── .env.local                # API_SECRET_KEY (not committed)
 │
 ├── extension/                    # Chrome Extension (Manifest V3)
 │   ├── manifest.json
-│   ├── popup/                    # Save UI shown on extension click
-│   ├── content/content.js        # Link extraction from X.com DOM
+│   ├── popup/                    # Save UI — shows current page URL + Save button
 │   ├── background/service-worker.js
 │   └── options/                  # API URL + key configuration
 ```
@@ -68,7 +82,7 @@ Single `articles` table:
 
 ### `POST /api/articles`
 - **Auth**: `Authorization: Bearer <API_SECRET_KEY>` (shared secret)
-- **Body**: `{ url, tweetUrl? }`
+- **Body**: `{ url }`
 - Server checks for duplicate, calls `unfurl(url)` for metadata, inserts row
 - Returns `{ status: 'created' | 'duplicate', article }`
 - CORS headers for extension origin
@@ -80,49 +94,34 @@ Single `articles` table:
 
 ## Extension Design
 
-- **Content script** (`content/content.js`): Listens for messages from popup. On request, scans current page DOM for external links using `data-testid="card.wrapper"` and `data-testid="tweetText"` selectors. Returns `{ url, tweetUrl }[]`.
-- **Popup** (`popup/popup.js`): Shows detected links with "Save" buttons. Calls `POST /api/articles`. Shows saved/duplicate/error status.
+- **Popup** (`popup/popup.js`): On open, reads the active tab's URL via `chrome.tabs.query`. Shows the URL and a "Save" button. Calls `POST /api/articles`. Shows saved/duplicate/error status.
 - **Options page**: Form to set API URL and API key, stored in `chrome.storage.sync`.
-- Metadata extraction happens **server-side** (not in extension) — more reliable, handles t.co redirects, no DOM scraping fragility for metadata.
+- **Permissions**: Only `storage` and `activeTab` — no content scripts, no broad host permissions.
+- Metadata extraction happens **server-side** (not in extension) — more reliable, handles redirects, no DOM scraping.
 
-## Build Order
+## Current Status
 
-### Phase 1: Web App Foundation
-1. `npx create-next-app@latest web` (TypeScript, Tailwind, App Router)
-2. Install deps: `drizzle-orm`, `better-sqlite3`, `unfurl.js`, `drizzle-kit`
-3. Create DB schema + connection (`src/db/`)
-4. Run `drizzle-kit generate && drizzle-kit migrate`
-5. Create unfurl wrapper (`src/lib/unfurl.ts`)
-6. Create `.env.local` with `API_SECRET_KEY`
+### Completed
+- [x] **Phase 1**: Next.js app scaffolded with TypeScript + Tailwind
+- [x] **Phase 1**: SQLite + Drizzle ORM schema + connection
+- [x] **Phase 1**: `unfurl.js` wrapper for metadata extraction
+- [x] **Phase 2**: `POST /api/articles` with auth, dedup, CORS, and unfurl metadata extraction
+- [x] **Phase 2**: `GET /api/articles` with pagination
+- [x] **Phase 3**: Chrome extension (Manifest V3) — popup saves current page URL, options page for API config
+- [x] **Phase 4**: Weekly-grouped article list UI (`article-card`, `week-group`, `article-list` components)
+- [x] **Phase 4**: Homepage renders articles grouped by week using `date-fns`
 
-### Phase 2: API Endpoints
-7. Build `POST` and `GET` in `src/app/api/articles/route.ts` with CORS + auth
-8. Test with curl
+### Remaining (Phase 5 — Polish)
+- [ ] Add delete functionality (`DELETE /api/articles/[id]`)
+- [ ] Handle edge cases (empty states, error boundaries)
+- [ ] Add a proper README
 
-### Phase 3: Chrome Extension
-9. Create `extension/` with manifest.json (Manifest V3, x.com + twitter.com hosts)
-10. Build options page (API URL + key config)
-11. Build content script (link detection from tweets)
-12. Build popup (detected links list + save buttons)
-13. Create placeholder icons
-14. Load unpacked in Chrome, test on x.com
+## Setup & Verification
 
-### Phase 4: Frontend Display
-15. Create `week-utils.ts` (week start calc, grouping, label formatting)
-16. Build `article-card.tsx`, `week-group.tsx`, `article-list.tsx`
-17. Wire up `page.tsx` — render weekly-grouped article list
-18. Style with Tailwind
-
-### Phase 5: Polish
-19. Add delete functionality (`DELETE /api/articles/[id]`)
-20. Handle edge cases (content script not loaded, empty states)
-21. Git init, `.gitignore`, README
-
-## Verification
-
-1. Start the Next.js dev server (`npm run dev` in `web/`)
-2. `curl POST` a test URL to `/api/articles` — verify metadata is extracted and stored
-3. Open `localhost:3000` — verify the article appears in the correct week group
-4. Load extension in Chrome, navigate to a tweet with a link, click extension icon — verify link is detected
-5. Click "Save" in popup — verify it saves and appears on the web app
-6. Save the same link again — verify duplicate detection works
+1. In `web/`: `npm install && npm run db:push && npm run dev`
+2. Create `web/.env.local` with `API_SECRET_KEY=dev-change-me`
+3. Test API: `curl -X POST http://localhost:3000/api/articles -H "Content-Type: application/json" -H "Authorization: Bearer dev-change-me" -d '{"url":"https://example.com"}'`
+4. Open `http://localhost:3000` — verify article appears in the correct week group with metadata
+5. Load `extension/` as unpacked in Chrome (`chrome://extensions`, Developer mode)
+6. Open extension options, set API URL to `http://localhost:3000` and key to `dev-change-me`
+7. Navigate to any article page, click extension icon, click Save — verify it appears on the web app

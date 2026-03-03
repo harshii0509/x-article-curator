@@ -3,6 +3,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { articles } from "@/db/schema";
+import { unfurlUrl } from "@/lib/unfurl";
 
 export const runtime = "nodejs";
 
@@ -124,11 +125,19 @@ export async function POST(request: Request) {
     );
   }
 
+  let metadata = {};
+  try {
+    metadata = await unfurlUrl(url);
+  } catch {
+    /* save with null metadata if unfurl fails */
+  }
+
   const now = Date.now();
 
   const [inserted] = await db.insert(articles).values({
     url,
-    tweetUrl,
+    tweetUrl: tweetUrl ?? null,
+    ...metadata,
     savedAt: now,
     createdAt: now,
   }).returning();
