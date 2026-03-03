@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { signIn, signOut, useSession } from "next-auth/react";
 
 export function AuthHeader() {
@@ -15,7 +16,7 @@ export function AuthHeader() {
     return (
       <button
         type="button"
-        onClick={() => signIn("google")}
+        onClick={() => signIn("google", { prompt: "select_account" })}
         className="mt-3 inline-flex items-center rounded-full bg-zinc-900 px-4 py-1.5 text-xs font-medium text-zinc-50 shadow-sm hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
       >
         Sign in with Google
@@ -61,6 +62,8 @@ export function ApiTokenSection() {
   const user = session?.user as any;
   const token = user?.apiToken as string | undefined;
 
+  const [copied, setCopied] = useState(false);
+
   if (!session?.user) {
     return (
       <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
@@ -77,6 +80,10 @@ export function ApiTokenSection() {
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(token);
+      setCopied(true);
+      window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     } catch {
       // ignore
     }
@@ -93,7 +100,7 @@ export function ApiTokenSection() {
           onClick={handleCopy}
           className="rounded-full border border-zinc-300 px-3 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
         >
-          Copy
+          {copied ? "Copied!" : "Copy"}
         </button>
       </div>
       <p className="mt-2 break-all rounded-md bg-zinc-900/90 px-3 py-2 font-mono text-[11px] text-zinc-50 dark:bg-black">

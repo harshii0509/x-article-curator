@@ -3,6 +3,7 @@ import type { ComponentPropsWithoutRef } from "react";
 import type { inferSelectModel } from "drizzle-orm";
 
 import { articles } from "@/db/schema";
+import { DeleteButton } from "@/components/delete-button";
 
 type Article = inferSelectModel<typeof articles>;
 
@@ -29,8 +30,11 @@ export function ArticleCard({ article, className, ...props }: ArticleCardProps) 
         </div>
       )}
       <div className="min-w-0 flex-1 space-y-1.5">
-        <div className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
-          {article.siteName ?? "Saved link"}
+        <div className="flex items-start justify-between gap-3">
+          <div className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
+            {article.siteName ?? "Saved link"}
+          </div>
+          {article.id != null ? <DeleteButton articleId={article.id} /> : null}
         </div>
         <a
           href={article.url}

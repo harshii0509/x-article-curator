@@ -90,17 +90,25 @@ export async function GET(request: Request) {
     );
   }
 
-  const baseQuery = db
+  // For the global API key, do not expose all users' articles.
+  if (auth.type === "apiKey") {
+    return withCors(
+      {
+        articles: [],
+        page,
+        limit,
+      },
+      { status: 200 },
+    );
+  }
+
+  const allArticles = await db
     .select()
     .from(articles)
+    .where(eq(articles.userId, auth.user.id))
     .orderBy(desc(articles.savedAt))
     .limit(limit)
     .offset(offset);
-
-  const allArticles =
-    auth.type === "user"
-      ? await baseQuery.where(eq(articles.userId, auth.user.id))
-      : await baseQuery;
 
   return withCors(
     {
