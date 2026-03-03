@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { articles } from "@/db/schema";
+import { articles, users } from "@/db/schema";
 import { unfurlUrl } from "@/lib/unfurl";
 
 export const runtime = "nodejs";
@@ -32,6 +32,34 @@ function getAuthSecret() {
   return secret;
 }
 
+async function resolveAuth(request: Request) {
+  const authHeader = request.headers.get("authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length)
+    : "";
+
+  if (!token) {
+    return { type: "unauthorized" as const };
+  }
+
+  const apiSecret = getAuthSecret();
+  if (token === apiSecret) {
+    return { type: "apiKey" as const };
+  }
+
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.apiToken, token))
+    .limit(1);
+
+  if (!user.length) {
+    return { type: "unauthorized" as const };
+  }
+
+  return { type: "user" as const, user: user[0] };
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const pageParam = url.searchParams.get("page") ?? "1";
@@ -41,12 +69,38 @@ export async function GET(request: Request) {
   const limit = Number.isNaN(Number(limitParam)) ? 50 : Number(limitParam);
   const offset = (page - 1) * limit;
 
-  const allArticles = await db
+  let auth;
+  try {
+    auth = await resolveAuth(request);
+  } catch (error) {
+    return withCors(
+      { error: (error as Error).message },
+      {
+        status: 500,
+      },
+    );
+  }
+
+  if (auth.type === "unauthorized") {
+    return withCors(
+      { error: "Unauthorized" },
+      {
+        status: 401,
+      },
+    );
+  }
+
+  const baseQuery = db
     .select()
     .from(articles)
     .orderBy(desc(articles.savedAt))
     .limit(limit)
     .offset(offset);
+
+  const allArticles =
+    auth.type === "user"
+      ? await baseQuery.where(eq(articles.userId, auth.user.id))
+      : await baseQuery;
 
   return withCors(
     {
@@ -82,10 +136,9 @@ export async function POST(request: Request) {
       },
     );
   }
-
-  let secret: string;
+  let auth;
   try {
-    secret = getAuthSecret();
+    auth = await resolveAuth(request);
   } catch (error) {
     return withCors(
       { error: (error as Error).message },
@@ -95,10 +148,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const authHeader = request.headers.get("authorization") ?? "";
-  const expectedHeader = `Bearer ${secret}`;
-
-  if (authHeader !== expectedHeader) {
+  if (auth.type === "unauthorized") {
     return withCors(
       { error: "Unauthorized" },
       {
@@ -107,10 +157,17 @@ export async function POST(request: Request) {
     );
   }
 
+  const userId = auth.type === "user" ? auth.user.id : null;
+
+  const where =
+    userId === null
+      ? and(eq(articles.url, url), isNull(articles.userId))
+      : and(eq(articles.url, url), eq(articles.userId, userId));
+
   const existing = await db
     .select()
     .from(articles)
-    .where(eq(articles.url, url))
+    .where(where)
     .limit(1);
 
   if (existing.length > 0) {
@@ -137,6 +194,7 @@ export async function POST(request: Request) {
   const [inserted] = await db.insert(articles).values({
     url,
     tweetUrl: tweetUrl ?? null,
+    userId,
     ...metadata,
     savedAt: now,
     createdAt: now,

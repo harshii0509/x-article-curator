@@ -1,4 +1,4 @@
-import unfurl from "unfurl.js";
+import { unfurl } from "unfurl.js";
 
 export interface ArticleMetadata {
   title?: string;

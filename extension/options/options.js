@@ -32,7 +32,7 @@ async function saveOptions() {
   }
 
   if (!apiKey) {
-    setStatus("API secret key is required.", true);
+    setStatus("Personal API token is required.", true);
     saveButton.disabled = false;
     return;
   }

@@ -1,17 +1,26 @@
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import { getServerSession } from "next-auth/next";
 
 import { db } from "@/db";
 import { articles } from "@/db/schema";
 import { groupByWeek } from "@/lib/week-utils";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 import { ArticleCard } from "./article-card";
 import { WeekGroup } from "./week-group";
 
 export async function ArticleList() {
-  const allArticles = await db
+  const session = await getServerSession(authOptions);
+  const userId = (session?.user as any)?.id as number | undefined;
+
+  const query = db
     .select()
     .from(articles)
     .orderBy(desc(articles.savedAt));
+
+  const allArticles = userId
+    ? await query.where(eq(articles.userId, userId))
+    : await query;
 
   if (!allArticles.length) {
     return (

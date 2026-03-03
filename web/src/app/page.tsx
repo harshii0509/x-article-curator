@@ -1,4 +1,5 @@
 import { ArticleList } from "@/components/article-list";
+import { ApiTokenSection, AuthHeader } from "@/components/auth-header";
 
 export default function Home() {
   return (
@@ -11,10 +12,14 @@ export default function Home() {
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             A quiet weekly reading list for links you save from X / Twitter.
           </p>
+          <AuthHeader />
         </header>
-        <section>
-          {/* @ts-expect-error Async Server Component */}
-          <ArticleList />
+        <section className="space-y-4">
+          <ApiTokenSection />
+          <div>
+            {/* @ts-expect-error Async Server Component */}
+            <ArticleList />
+          </div>
         </section>
       </main>
     </div>
