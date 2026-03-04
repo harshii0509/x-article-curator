@@ -3,6 +3,7 @@ import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   email: text("email").notNull().unique(),
+  googleId: text("google_id"),
   name: text("name"),
   image: text("image"),
   apiToken: text("api_token").notNull().unique(),
@@ -33,13 +34,4 @@ export const articles = sqliteTable(
     ),
   }),
 );
-
-export const otpCodes = sqliteTable("otp_codes", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  email: text("email").notNull(),
-  code: text("code").notNull(),
-  expiresAt: integer("expires_at", { mode: "number" }).notNull(),
-  used: integer("used", { mode: "number" }).notNull().default(0),
-  createdAt: integer("created_at", { mode: "number" }).notNull(),
-});
 

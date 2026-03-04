@@ -1,11 +1,11 @@
 import type { ComponentPropsWithoutRef } from "react";
 
-import type { inferSelectModel } from "drizzle-orm";
+import type { InferSelectModel } from "drizzle-orm";
 
 import { articles } from "@/db/schema";
 import { DeleteButton } from "@/components/delete-button";
 
-type Article = inferSelectModel<typeof articles>;
+type Article = InferSelectModel<typeof articles>;
 
 interface ArticleCardProps extends ComponentPropsWithoutRef<"article"> {
   article: Article;

@@ -32,6 +32,8 @@ export function ArticleList() {
   }>({ status: "loading", articles: [] });
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
       const token =
         typeof window !== "undefined"
@@ -39,7 +41,9 @@ export function ArticleList() {
           : null;
 
       if (!token) {
-        setState({ status: "no-token", articles: [] });
+        if (!cancelled) {
+          setState({ status: "no-token", articles: [] });
+        }
         return;
       }
 
@@ -52,30 +56,44 @@ export function ArticleList() {
         const data: ApiResponse = await res.json();
 
         if (!res.ok || "error" in data) {
-          setState({
-            status: "error",
-            articles: [],
-            error: (data as any).error ?? "Failed to load articles",
-          });
+          if (!cancelled) {
+            setState({
+              status: "error",
+              articles: [],
+              error: (data as any).error ?? "Failed to load articles",
+            });
+          }
           return;
         }
 
         if (!data.articles.length) {
-          setState({ status: "empty", articles: [] });
+          if (!cancelled) {
+            setState({ status: "empty", articles: [] });
+          }
           return;
         }
 
-        setState({ status: "ok", articles: data.articles });
+        if (!cancelled) {
+          setState({ status: "ok", articles: data.articles });
+        }
       } catch {
-        setState({
-          status: "error",
-          articles: [],
-          error: "Failed to load articles",
-        });
+        if (!cancelled) {
+          setState({
+            status: "error",
+            articles: [],
+            error: "Failed to load articles",
+          });
+        }
       }
     }
 
     load();
+    const intervalId = window.setInterval(load, 10000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   if (state.status === "loading") {

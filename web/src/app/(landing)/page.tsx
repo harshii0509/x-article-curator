@@ -45,7 +45,7 @@ export default function LandingPage() {
             className="inline-flex items-center rounded-sm bg-[#2A2A28] px-2 py-2 text-[13px] font-medium text-[#EDEDED] hover:bg-[#343431]"
             style={{ fontFamily: "var(--font-inter)", lineHeight: "120%" }}
           >
-            Login to get started
+            Get started
           </Link>
         </div>
       </main>

@@ -4,102 +4,109 @@ import { useEffect, useRef, useState } from "react";
 
 type AuthState =
   | { status: "idle" }
-  | { status: "sending" }
-  | { status: "code-sent"; email: string }
-  | { status: "verifying"; email: string }
+  | { status: "loading" }
   | { status: "authenticated"; email: string };
 
 const TOKEN_KEY = "nightstand-api-token";
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 export function AuthHeader() {
   const [auth, setAuth] = useState<AuthState>({ status: "idle" });
-  const [emailInput, setEmailInput] = useState("");
-  const [codeDigits, setCodeDigits] = useState<string[]>([
-    "",
-    "",
-    "",
-    "",
-    "",
-    "",
-  ]);
   const [error, setError] = useState<string | null>(null);
-  const codeInputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  const [googleReady, setGoogleReady] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const existing = window.localStorage.getItem(TOKEN_KEY);
-      if (existing) {
-        const email =
-          window.localStorage.getItem(`${TOKEN_KEY}:email`) ?? "";
-        setAuth({ status: "authenticated", email });
-      }
+    if (typeof window === "undefined") return;
+    const existing = window.localStorage.getItem(TOKEN_KEY);
+    if (existing) {
+      const email =
+        window.localStorage.getItem(`${TOKEN_KEY}:email`) ?? "";
+      setAuth({ status: "authenticated", email });
     }
   }, []);
 
-  const handleSendCode = async () => {
-    const email = emailInput.trim();
-    if (!email) return;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!GOOGLE_CLIENT_ID) return;
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      initializeGoogle();
+      return;
+    }
 
+    const scriptId = "google-identity-services";
+    if (document.getElementById(scriptId)) {
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = scriptId;
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      initializeGoogle();
+    };
+    document.head.appendChild(script);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const initializeGoogle = () => {
+    if (!GOOGLE_CLIENT_ID) return;
+    if (!googleButtonRef.current) return;
+    if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+      return;
+    }
+    if (googleButtonRef.current.hasChildNodes()) {
+      setGoogleReady(true);
+      return;
+    }
+
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: handleGoogleCredential,
+    });
+    window.google.accounts.id.renderButton(googleButtonRef.current, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      shape: "pill",
+      width: 320,
+      text: "continue_with",
+    });
+    setGoogleReady(true);
+  };
+
+  const handleGoogleCredential = async (response: { credential?: string }) => {
+    if (!response.credential) return;
     setError(null);
-    setAuth({ status: "sending" });
-
+    setAuth({ status: "loading" });
     try {
-      const res = await fetch("/api/auth/send-otp", {
+      const res = await fetch("/api/auth/google", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ credential: response.credential }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to send code");
+      if (!res.ok || !data.user?.apiToken) {
+        setError(data.error ?? "Google sign-in failed");
         setAuth({ status: "idle" });
         return;
       }
-      setCodeDigits(["", "", "", "", "", ""]);
-      setAuth({ status: "code-sent", email });
-    } catch {
-      setError("Failed to send code");
-      setAuth({ status: "idle" });
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    if (auth.status !== "code-sent") return;
-    const code = codeDigits.join("").trim();
-    if (!code) return;
-
-    setError(null);
-    setAuth({ status: "verifying", email: auth.email });
-
-    try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: auth.email, code }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to verify code");
-        setAuth({ status: "code-sent", email: auth.email });
-        return;
-      }
-
-      const apiToken = data.user?.apiToken as string | undefined;
-      if (typeof window !== "undefined" && apiToken) {
-        window.localStorage.setItem(TOKEN_KEY, apiToken);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(TOKEN_KEY, data.user.apiToken);
         window.localStorage.setItem(
           `${TOKEN_KEY}:email`,
-          data.user?.email ?? auth.email,
+          data.user.email ?? "",
         );
       }
-
       setAuth({
         status: "authenticated",
-        email: data.user?.email ?? auth.email,
+        email: data.user.email ?? "",
       });
     } catch {
-      setError("Failed to verify code");
-      setAuth({ status: "code-sent", email: auth.email });
+      setError("Google sign-in failed");
+      setAuth({ status: "idle" });
     }
   };
 
@@ -110,8 +117,6 @@ export function AuthHeader() {
       window.localStorage.removeItem(`${TOKEN_KEY}:email`);
     }
     setAuth({ status: "idle" });
-    setEmailInput("");
-    setCodeDigits(["", "", "", "", "", ""]);
     setError(null);
   };
 
@@ -123,7 +128,7 @@ export function AuthHeader() {
             {auth.email}
           </span>
           <span className="text-[11px] text-zinc-500">
-            Signed in with email
+            Signed in
           </span>
         </div>
         <button
@@ -137,85 +142,22 @@ export function AuthHeader() {
     );
   }
 
-  const isCodeStep =
-    auth.status === "code-sent" || auth.status === "verifying";
-
-  const handleDigitChange = (index: number, value: string) => {
-    const next = value.replace(/[^0-9]/g, "").slice(0, 1);
-    setCodeDigits((prev) => {
-      const copy = [...prev];
-      copy[index] = next;
-      return copy;
-    });
-
-    if (next && codeInputsRef.current[index + 1]) {
-      codeInputsRef.current[index + 1]?.focus();
-    }
-  };
-
-  const handleDigitKeyDown = (
-    index: number,
-    event: React.KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (event.key === "Backspace" && !codeDigits[index]) {
-      if (codeInputsRef.current[index - 1]) {
-        event.preventDefault();
-        codeInputsRef.current[index - 1]?.focus();
-      }
-    }
-  };
+  const isLoading = auth.status === "loading";
 
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
       <div className="w-full max-w-sm rounded-xl bg-black/70 px-6 py-5 text-xs text-zinc-300 shadow-lg shadow-black/60">
-        {!isCodeStep ? (
-          <>
-            <input
-              type="email"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              placeholder="Enter your email"
-              className="mb-3 w-full rounded-md bg-zinc-900 px-3 py-2 text-[13px] text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600"
-            />
-            <button
-              type="button"
-              onClick={handleSendCode}
-              disabled={auth.status === "sending" || !emailInput.trim()}
-              className="inline-flex w-full items-center justify-center rounded-md bg-[#F4C96B] px-2 py-2 text-[13px] font-medium text-zinc-950 hover:bg-[#f7d480] disabled:opacity-50 focus:outline-none"
-            >
-              {auth.status === "sending" ? "Sending code…" : "Send one-time OTP"}
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="mb-3 flex justify-between gap-2">
-              {codeDigits.map((digit, index) => (
-                <input
-                  // eslint-disable-next-line react/no-array-index-key
-                  key={index}
-                  ref={(el) => {
-                    codeInputsRef.current[index] = el;
-                  }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleDigitChange(index, e.target.value)}
-                  onKeyDown={(e) => handleDigitKeyDown(index, e)}
-                  className="h-9 w-9 rounded-md border border-zinc-700 bg-zinc-900 text-center text-[13px] text-zinc-50 focus:outline-none focus:ring-1 focus:ring-zinc-500"
-                />
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={handleVerifyCode}
-              disabled={auth.status === "verifying"}
-              className="inline-flex w-full items-center justify-center rounded-md bg-zinc-200 px-2 py-2 text-[13px] font-medium text-zinc-950 hover:bg-zinc-100 disabled:opacity-60"
-            >
-              {auth.status === "verifying" ? "Verifying…" : "Verify code"}
-            </button>
-          </>
+        {error && (
+          <p className="mb-3 text-[11px] text-red-400">
+            {error}
+          </p>
         )}
+        <div className="flex justify-center">
+          <div
+            ref={googleButtonRef}
+            className={`flex justify-center ${!googleReady || isLoading ? "opacity-50" : ""}`}
+          />
+        </div>
       </div>
     </div>
   );
