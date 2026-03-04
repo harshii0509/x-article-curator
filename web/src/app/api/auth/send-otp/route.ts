@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { and, gt, eq, sql } from "drizzle-orm";
+import { and, gt, eq, lt, sql } from "drizzle-orm";
+import { randomInt } from "node:crypto";
 
 import { db } from "@/db";
 import { otpCodes } from "@/db/schema";
@@ -33,6 +34,9 @@ export async function POST(request: Request) {
   const now = Date.now();
   const oneHourAgo = now - ONE_HOUR_MS;
 
+  // Cleanup old codes to avoid unbounded growth.
+  await db.delete(otpCodes).where(lt(otpCodes.expiresAt, oneHourAgo));
+
   const recentCount = await db
     .select({ count: sql<number>`count(*)` })
     .from(otpCodes)
@@ -50,7 +54,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  const code = randomInt(100000, 1000000).toString();
 
   const expiresAt = now + TEN_MINUTES_MS;
 

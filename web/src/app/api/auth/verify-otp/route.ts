@@ -7,6 +7,10 @@ import { otpCodes, users } from "@/db/schema";
 
 export const runtime = "nodejs";
 
+const TEN_MINUTES_MS = 10 * 60 * 1000;
+
+const failedAttempts = new Map<string, { count: number; first: number }>();
+
 export async function POST(request: Request) {
   let body: { email?: string; code?: string } = {};
 
@@ -31,9 +35,17 @@ export async function POST(request: Request) {
 
   const now = Date.now();
 
-  const matches = await db
-    .select()
-    .from(otpCodes)
+  const bucket = failedAttempts.get(email);
+  if (bucket && now - bucket.first < TEN_MINUTES_MS && bucket.count >= 5) {
+    return NextResponse.json(
+      { error: "Too many attempts. Please try again later." },
+      { status: 429 },
+    );
+  }
+
+  const updated = await db
+    .update(otpCodes)
+    .set({ used: 1 })
     .where(
       and(
         eq(otpCodes.email, email),
@@ -42,21 +54,21 @@ export async function POST(request: Request) {
         gt(otpCodes.expiresAt, now),
       ),
     )
-    .limit(1);
+    .returning();
 
-  if (!matches.length) {
+  if (!updated.length) {
+    const prev = failedAttempts.get(email);
+    if (!prev || now - prev.first >= TEN_MINUTES_MS) {
+      failedAttempts.set(email, { count: 1, first: now });
+    } else {
+      failedAttempts.set(email, { count: prev.count + 1, first: prev.first });
+    }
+
     return NextResponse.json(
       { error: "Invalid or expired code" },
       { status: 400 },
     );
   }
-
-  const match = matches[0];
-
-  await db
-    .update(otpCodes)
-    .set({ used: 1 })
-    .where(eq(otpCodes.id, match.id));
 
   const existing = await db
     .select()

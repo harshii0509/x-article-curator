@@ -26,6 +26,7 @@ export function ArticleCard({ article, className, ...props }: ArticleCardProps) 
         <img
           src={article.imageUrl}
           alt={article.title ?? ""}
+          loading="lazy"
           className="h-20 w-24 flex-none rounded-md object-cover"
         />
       ) : (

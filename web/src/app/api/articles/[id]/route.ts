@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { articles, users } from "@/db/schema";
+import { articles } from "@/db/schema";
+import { resolveAuth } from "@/lib/auth";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,44 +21,6 @@ function withCors<T>(body: T, init?: ResponseInit) {
   });
 }
 
-function getAuthSecret() {
-  const secret = process.env.API_SECRET_KEY;
-  if (!secret) {
-    throw new Error("API_SECRET_KEY is not configured");
-  }
-
-  return secret;
-}
-
-async function resolveUserFromToken(request: Request) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length)
-    : "";
-
-  if (!token) {
-    return null;
-  }
-
-  const apiSecret = getAuthSecret();
-  if (token === apiSecret) {
-    // Global API key is not allowed for deletes.
-    return null;
-  }
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(eq(users.apiToken, token))
-    .limit(1);
-
-  if (!user.length) {
-    return null;
-  }
-
-  return user[0];
-}
-
 export async function DELETE(request: Request) {
   const url = new URL(request.url);
   const segments = url.pathname.split("/");
@@ -73,9 +36,9 @@ export async function DELETE(request: Request) {
     );
   }
 
-  let user;
+  let auth;
   try {
-    user = await resolveUserFromToken(request);
+    auth = await resolveAuth(request);
   } catch (error) {
     return withCors(
       { error: (error as Error).message },
@@ -85,7 +48,7 @@ export async function DELETE(request: Request) {
     );
   }
 
-  if (!user) {
+  if (auth.type !== "user") {
     return withCors(
       { error: "Unauthorized" },
       {
@@ -112,7 +75,7 @@ export async function DELETE(request: Request) {
   const article = existing[0];
 
   // Only allow delete if it belongs to this user or is unowned (legacy rows).
-  if (article.userId !== null && article.userId !== user.id) {
+  if (article.userId !== null && article.userId !== auth.user.id) {
     return withCors(
       { error: "Forbidden" },
       {
@@ -139,9 +102,9 @@ export async function PATCH(request: Request) {
     );
   }
 
-  let user;
+  let auth;
   try {
-    user = await resolveUserFromToken(request);
+    auth = await resolveAuth(request);
   } catch (error) {
     return withCors(
       { error: (error as Error).message },
@@ -149,7 +112,7 @@ export async function PATCH(request: Request) {
     );
   }
 
-  if (!user) {
+  if (auth.type !== "user") {
     return withCors({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -165,7 +128,7 @@ export async function PATCH(request: Request) {
 
   const article = existing[0];
 
-  if (article.userId !== null && article.userId !== user.id) {
+  if (article.userId !== null && article.userId !== auth.user.id) {
     return withCors({ error: "Forbidden" }, { status: 403 });
   }
 

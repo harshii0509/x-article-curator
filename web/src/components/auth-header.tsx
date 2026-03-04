@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type AuthState =
   | { status: "idle" }
@@ -14,8 +14,16 @@ const TOKEN_KEY = "nightstand-api-token";
 export function AuthHeader() {
   const [auth, setAuth] = useState<AuthState>({ status: "idle" });
   const [emailInput, setEmailInput] = useState("");
-  const [codeInput, setCodeInput] = useState("");
+  const [codeDigits, setCodeDigits] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
   const [error, setError] = useState<string | null>(null);
+  const codeInputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -47,6 +55,7 @@ export function AuthHeader() {
         setAuth({ status: "idle" });
         return;
       }
+      setCodeDigits(["", "", "", "", "", ""]);
       setAuth({ status: "code-sent", email });
     } catch {
       setError("Failed to send code");
@@ -56,7 +65,7 @@ export function AuthHeader() {
 
   const handleVerifyCode = async () => {
     if (auth.status !== "code-sent") return;
-    const code = codeInput.trim();
+    const code = codeDigits.join("").trim();
     if (!code) return;
 
     setError(null);
@@ -102,7 +111,7 @@ export function AuthHeader() {
     }
     setAuth({ status: "idle" });
     setEmailInput("");
-    setCodeInput("");
+    setCodeDigits(["", "", "", "", "", ""]);
     setError(null);
   };
 
@@ -128,52 +137,86 @@ export function AuthHeader() {
     );
   }
 
+  const isCodeStep =
+    auth.status === "code-sent" || auth.status === "verifying";
+
+  const handleDigitChange = (index: number, value: string) => {
+    const next = value.replace(/[^0-9]/g, "").slice(0, 1);
+    setCodeDigits((prev) => {
+      const copy = [...prev];
+      copy[index] = next;
+      return copy;
+    });
+
+    if (next && codeInputsRef.current[index + 1]) {
+      codeInputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handleDigitKeyDown = (
+    index: number,
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (event.key === "Backspace" && !codeDigits[index]) {
+      if (codeInputsRef.current[index - 1]) {
+        event.preventDefault();
+        codeInputsRef.current[index - 1]?.focus();
+      }
+    }
+  };
+
   return (
-    <div className="mt-3 flex flex-col gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-      {error ? (
-        <p className="text-[11px] text-red-500">{error}</p>
-      ) : null}
-      {auth.status === "idle" || auth.status === "sending" ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="email"
-            value={emailInput}
-            onChange={(e) => setEmailInput(e.target.value)}
-            placeholder="you@example.com"
-            className="h-8 min-w-[180px] flex-1 rounded-full border border-zinc-300 bg-transparent px-3 text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:text-zinc-50"
-          />
-          <button
-            type="button"
-            onClick={handleSendCode}
-            disabled={auth.status === "sending"}
-            className="inline-flex items-center rounded-full bg-zinc-900 px-4 py-1.5 text-xs font-medium text-zinc-50 shadow-sm hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            {auth.status === "sending" ? "Sending…" : "Send code"}
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            value={codeInput}
-            onChange={(e) => setCodeInput(e.target.value)}
-            placeholder="6-digit code"
-            className="h-8 min-w-[120px] flex-1 rounded-full border border-zinc-300 bg-transparent px-3 text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:text-zinc-50"
-          />
-          <button
-            type="button"
-            onClick={handleVerifyCode}
-            disabled={auth.status === "verifying"}
-            className="inline-flex items-center rounded-full bg-zinc-900 px-4 py-1.5 text-xs font-medium text-zinc-50 shadow-sm hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            {auth.status === "verifying" ? "Verifying…" : "Verify"}
-          </button>
-        </div>
-      )}
-      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-        We&apos;ll email you a one-time code. No passwords, no Google account
-        required.
-      </p>
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="w-full max-w-sm rounded-xl bg-black/70 px-6 py-5 text-xs text-zinc-300 shadow-lg shadow-black/60">
+        {!isCodeStep ? (
+          <>
+            <input
+              type="email"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              placeholder="Enter your email"
+              className="mb-3 w-full rounded-md bg-zinc-900 px-3 py-2 text-[13px] text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600"
+            />
+            <button
+              type="button"
+              onClick={handleSendCode}
+              disabled={auth.status === "sending" || !emailInput.trim()}
+              className="inline-flex w-full items-center justify-center rounded-md bg-[#F4C96B] px-2 py-2 text-[13px] font-medium text-zinc-950 hover:bg-[#f7d480] disabled:opacity-50 focus:outline-none"
+            >
+              {auth.status === "sending" ? "Sending code…" : "Send one-time OTP"}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="mb-3 flex justify-between gap-2">
+              {codeDigits.map((digit, index) => (
+                <input
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={index}
+                  ref={(el) => {
+                    codeInputsRef.current[index] = el;
+                  }}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleDigitChange(index, e.target.value)}
+                  onKeyDown={(e) => handleDigitKeyDown(index, e)}
+                  className="h-9 w-9 rounded-md border border-zinc-700 bg-zinc-900 text-center text-[13px] text-zinc-50 focus:outline-none focus:ring-1 focus:ring-zinc-500"
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleVerifyCode}
+              disabled={auth.status === "verifying"}
+              className="inline-flex w-full items-center justify-center rounded-md bg-zinc-200 px-2 py-2 text-[13px] font-medium text-zinc-950 hover:bg-zinc-100 disabled:opacity-60"
+            >
+              {auth.status === "verifying" ? "Verifying…" : "Verify code"}
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -191,12 +234,7 @@ export function ApiTokenSection() {
   }, []);
 
   if (!token) {
-    return (
-      <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-3 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
-        After signing in, your personal API token for the browser extension will
-        appear here.
-      </div>
-    );
+    return null;
   }
 
   const handleCopy = async () => {

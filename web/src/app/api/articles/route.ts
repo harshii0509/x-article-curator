@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { articles, users } from "@/db/schema";
+import { articles } from "@/db/schema";
 import { unfurlUrl } from "@/lib/unfurl";
+import { resolveAuth } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -21,43 +22,6 @@ function withCors<T>(body: T, init?: ResponseInit) {
       ...corsHeaders,
     },
   });
-}
-
-function getAuthSecret() {
-  const secret = process.env.API_SECRET_KEY;
-  if (!secret) {
-    throw new Error("API_SECRET_KEY is not configured");
-  }
-
-  return secret;
-}
-
-async function resolveAuth(request: Request) {
-  const authHeader = request.headers.get("authorization") ?? "";
-  const token = authHeader.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length)
-    : "";
-
-  if (!token) {
-    return { type: "unauthorized" as const };
-  }
-
-  const apiSecret = getAuthSecret();
-  if (token === apiSecret) {
-    return { type: "apiKey" as const };
-  }
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(eq(users.apiToken, token))
-    .limit(1);
-
-  if (!user.length) {
-    return { type: "unauthorized" as const };
-  }
-
-  return { type: "user" as const, user: user[0] };
 }
 
 export async function GET(request: Request) {
@@ -144,6 +108,20 @@ export async function POST(request: Request) {
       },
     );
   }
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      return withCors(
+        { error: "Only HTTP(S) URLs are allowed" },
+        { status: 400 },
+      );
+    }
+  } catch {
+    return withCors(
+      { error: "Invalid URL format" },
+      { status: 400 },
+    );
+  }
   let auth;
   try {
     auth = await resolveAuth(request);
@@ -165,12 +143,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const userId = auth.type === "user" ? auth.user.id : null;
+  if (auth.type !== "user") {
+    return withCors(
+      { error: "User authentication required to save articles" },
+      { status: 403 },
+    );
+  }
 
-  const where =
-    userId === null
-      ? and(eq(articles.url, url), isNull(articles.userId))
-      : and(eq(articles.url, url), eq(articles.userId, userId));
+  const userId = auth.user.id;
+
+  const where = and(eq(articles.url, url), eq(articles.userId, userId));
 
   const existing = await db
     .select()
@@ -193,8 +175,9 @@ export async function POST(request: Request) {
   let metadata = {};
   try {
     metadata = await unfurlUrl(url);
-  } catch {
-    /* save with null metadata if unfurl fails */
+  } catch (error) {
+    // Log but do not fail the request; we still save the bare URL.
+    console.error(`Failed to unfurl ${url}:`, error);
   }
 
   const now = Date.now();

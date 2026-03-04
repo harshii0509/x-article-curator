@@ -2,7 +2,6 @@ import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  googleId: text("google_id"),
   email: text("email").notNull().unique(),
   name: text("name"),
   image: text("image"),

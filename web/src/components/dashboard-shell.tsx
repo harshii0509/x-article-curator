@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { createContext, useMemo, useState } from "react";
 
 import { KeyboardHelp } from "./keyboard-help";
 import { Toast } from "./toast";
@@ -11,6 +11,16 @@ type DashboardShellProps = {
   children: ReactNode;
   itemCount: number;
 };
+
+type DashboardContextValue = {
+  focusedIndex: number | null;
+  setToast: (msg: string) => void;
+};
+
+export const DashboardContext = createContext<DashboardContextValue>({
+  focusedIndex: null,
+  setToast: () => {},
+});
 
 export function DashboardShell({ children, itemCount }: DashboardShellProps) {
   const { focusedIndex, showHelp, setShowHelp } = useKeyboardNav(
@@ -31,19 +41,4 @@ export function DashboardShell({ children, itemCount }: DashboardShellProps) {
     </DashboardContext.Provider>
   );
 }
-
-type DashboardContextValue = {
-  focusedIndex: number | null;
-  setToast: (msg: string) => void;
-};
-
-export const DashboardContext = /*#__PURE__*/ ((): React.Context<DashboardContextValue> => {
-  // Lazy import to avoid React import cycles in server components if used there.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const React = require("react") as typeof import("react");
-  return React.createContext<DashboardContextValue>({
-    focusedIndex: null,
-    setToast: () => {},
-  });
-})();
 

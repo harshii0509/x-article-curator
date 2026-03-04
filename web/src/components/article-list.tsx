@@ -87,14 +87,7 @@ export function ArticleList() {
   }
 
   if (state.status === "no-token") {
-    return (
-      <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
-        No API token found yet.
-        <br />
-        Sign in above to get your personal token, then use the browser
-        extension to send links here.
-      </div>
-    );
+    return null;
   }
 
   if (state.status === "empty") {
