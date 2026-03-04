@@ -12,9 +12,13 @@ interface ArticleCardProps extends ComponentPropsWithoutRef<"article"> {
 }
 
 export function ArticleCard({ article, className, ...props }: ArticleCardProps) {
+  const read = Boolean(article.isRead);
+
   return (
     <article
-      className={`flex gap-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-100 dark:border-zinc-800 dark:bg-zinc-900/60 ${className ?? ""}`}
+      className={`flex gap-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm shadow-zinc-100 dark:border-zinc-800 dark:bg-zinc-900/60 ${
+        read ? "opacity-60" : ""
+      } ${className ?? ""}`}
       {...props}
     >
       {article.imageUrl ? (
@@ -62,6 +66,7 @@ export function ArticleCard({ article, className, ...props }: ArticleCardProps) 
               View tweet
             </a>
           ) : null}
+          {read ? <span>• Read</span> : null}
         </div>
       </div>
     </article>

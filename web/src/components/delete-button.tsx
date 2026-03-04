@@ -1,7 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
-import { useSession } from "next-auth/react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 interface DeleteButtonProps {
@@ -9,12 +8,18 @@ interface DeleteButtonProps {
 }
 
 export function DeleteButton({ articleId }: DeleteButtonProps) {
-  const { data: session } = useSession();
+  const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const user = session?.user as any;
-  const token = user?.apiToken as string | undefined;
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("nightstand-api-token");
+      if (stored) {
+        setToken(stored);
+      }
+    }
+  }, []);
 
   const handleDelete = async () => {
     if (!token) return;
