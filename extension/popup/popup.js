@@ -14,7 +14,7 @@ function setStatus(text, cls) {
 }
 
 async function init() {
-  const config = await chrome.storage.sync.get(["apiUrl", "apiKey"]);
+  const config = await chrome.storage.local.get(["apiUrl", "apiKey"]);
   apiUrl = config.apiUrl;
   apiKey = config.apiKey;
 

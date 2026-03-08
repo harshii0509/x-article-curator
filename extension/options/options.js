@@ -9,10 +9,7 @@ function setStatus(message, isError = false) {
 }
 
 async function restoreOptions() {
-  const { apiUrl, apiKey } = await chrome.storage.sync.get([
-    "apiUrl",
-    "apiKey",
-  ]);
+  const { apiUrl, apiKey } = await chrome.storage.local.get(["apiUrl", "apiKey"]);
 
   if (apiUrl) apiUrlInput.value = apiUrl;
   if (apiKey) apiKeyInput.value = apiKey;
@@ -37,7 +34,7 @@ async function saveOptions() {
     return;
   }
 
-  await chrome.storage.sync.set({ apiUrl, apiKey });
+  await chrome.storage.local.set({ apiUrl, apiKey });
   setStatus("Saved.");
   saveButton.disabled = false;
 }
