@@ -6,6 +6,7 @@ export interface ArticleMetadata {
   description?: string;
   imageUrl?: string;
   siteName?: string;
+  favicon?: string;
 }
 
 export async function unfurlUrl(url: string): Promise<ArticleMetadata> {
@@ -48,12 +49,19 @@ export async function unfurlUrl(url: string): Promise<ArticleMetadata> {
     twitterCard.creator_id ??
     data?.metadata?.author;
 
+  const favicon =
+    data?.favicon ??
+    data?.icons?.[0]?.url ??
+    data?.metadata?.favicon ??
+    data?.metadata?.icon;
+
   return {
     title,
     author,
     description,
     imageUrl,
     siteName,
+    favicon,
   };
 }
 

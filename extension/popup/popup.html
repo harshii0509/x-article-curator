@@ -75,11 +75,13 @@
     </style>
   </head>
   <body>
-    <h1>Save to Reading List</h1>
-    <div id="config-hint" class="config-hint" hidden>
-      API not configured. Open
-      <span id="open-options" class="link">options</span>
-      to set the API URL and key.
+    <h1>Save to Nightstand</h1>
+    <div id="sign-in-section" class="config-hint" hidden>
+      <button id="sign-in-btn">Sign in with Google</button>
+    </div>
+    <div id="signed-in-section" class="config-hint" hidden>
+      Signed in as
+      <span id="account-email" class="link"></span>
     </div>
     <div id="page-url" class="page-url"></div>
     <div class="actions">

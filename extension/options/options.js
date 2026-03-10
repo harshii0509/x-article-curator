@@ -9,10 +9,18 @@ function setStatus(message, isError = false) {
 }
 
 async function restoreOptions() {
-  const { apiUrl, apiKey } = await chrome.storage.local.get(["apiUrl", "apiKey"]);
+  const { apiUrl, apiKey, nightstandApiToken } = await chrome.storage.local.get([
+    "apiUrl",
+    "apiKey",
+    "nightstandApiToken",
+  ]);
 
   if (apiUrl) apiUrlInput.value = apiUrl;
-  if (apiKey) apiKeyInput.value = apiKey;
+  if (apiKey) {
+    apiKeyInput.value = apiKey;
+  } else if (nightstandApiToken) {
+    apiKeyInput.value = nightstandApiToken;
+  }
 }
 
 async function saveOptions() {
@@ -34,7 +42,11 @@ async function saveOptions() {
     return;
   }
 
-  await chrome.storage.local.set({ apiUrl, apiKey });
+  await chrome.storage.local.set({
+    apiUrl,
+    apiKey,
+    nightstandApiToken: apiKey,
+  });
   setStatus("Saved.");
   saveButton.disabled = false;
 }

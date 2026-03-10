@@ -1,325 +1,324 @@
-# Nightstand — Implementation Plan
+# Link Saver — Architecture & Data Model
 
 ## Context
 
-Browsing Twitter/X, Substack, and the web produces a stream of interesting articles that get lost in bookmarks. You click a link in a tweet, land on the article, bookmark it "for later." Later never comes. By the weekend, it's buried under fifty other bookmarks.
-
-Nightstand is a personal tool that gives you a browser extension to save articles in one click, a backend that automatically extracts metadata (title, image, description), and a clean web app that shows your saved articles grouped by week — ready for weekend reading.
+New project. Save valuable links while browsing via a Chrome extension, view and organize them in a web app, and share them with friends — both via public URLs and directly with other users.
 
 ---
 
-## How It Works
+## High-Level Overview
 
-1. You find an article worth reading — on Twitter, Substack, a blog, anywhere.
-2. You click the **Nightstand** browser extension icon.
-3. The popup shows the current page URL and a **Save** button.
-4. You click Save — the extension sends the URL to the backend API.
-5. The server extracts Open Graph metadata (title, description, image, author, site name) via `unfurl.js`.
-6. The article is stored in SQLite and appears on the web app, grouped into the correct week.
-7. On the weekend, you open Nightstand — your reading list is waiting, organized by week.
+### Three Components
+
+```
+┌─────────────────────┐     ┌──────────────────────────────┐     ┌──────────┐
+│  Chrome Extension   │────▶│  Next.js Backend + Frontend  │────▶│ Database │
+│  (Manifest V3)      │     │  (API Routes + React UI)     │     │ (SQLite) │
+└─────────────────────┘     └──────────────────────────────┘     └──────────┘
+```
 
 ---
 
-## Architecture
+## 1. Chrome Extension (Frontend #1)
 
-Two components:
-1. **Chrome Extension** — Works on any page. Reads the current tab's URL and sends it to the backend API via a popup UI.
-2. **Next.js Web App** — Stores articles in SQLite, extracts metadata server-side, and renders a weekly-grouped reading list with keyboard-first navigation.
+**Purpose**: One-click save from any webpage.
+
+**Auth**: Google Sign-In (via Chrome Identity API — `chrome.identity.getAuthToken`). This gives the extension a Google ID token without any popup/redirect. The token is sent to the backend, which verifies it and returns an API token (UUID).
+
+**Flow**:
+1. User clicks extension icon on any page
+2. If not signed in → "Sign in with Google" button (uses `chrome.identity`)
+3. If signed in → shows current page title + URL + "Save" button
+4. On Save → `POST /api/links` with `Authorization: Bearer <apiToken>`
+5. Shows confirmation: "Saved!"
+
+**Permissions**: `identity`, `activeTab`, `storage`
+
+---
+
+## 2. Web App (Frontend #2 + Backend)
+
+**Framework**: Next.js 15 (App Router, TypeScript, Tailwind CSS)
+
+### Pages
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Landing page |
+| `/dashboard` | Your saved links (authenticated) |
+| `/collections` | Your collections (authenticated) |
+| `/collections/[id]` | Single collection view (authenticated) |
+| `/shared` | Links/collections shared with you (authenticated) |
+| `/c/[slug]` | Public collection page (no auth needed) |
+| `/login` | Google sign-in page |
+
+### API Routes
+
+| Method | Route | Purpose |
+|--------|-------|---------|
+| `POST` | `/api/auth/google` | Verify Google ID token, return apiToken |
+| `POST` | `/api/auth/logout` | Clear session |
+| `GET` | `/api/links` | List user's saved links |
+| `POST` | `/api/links` | Save a new link (+ auto-extract metadata) |
+| `DELETE` | `/api/links/[id]` | Delete a saved link |
+| `PATCH` | `/api/links/[id]` | Update link (mark read, edit) |
+| `GET` | `/api/collections` | List user's collections |
+| `POST` | `/api/collections` | Create a collection |
+| `PATCH` | `/api/collections/[id]` | Update collection (title, public/private) |
+| `DELETE` | `/api/collections/[id]` | Delete a collection |
+| `POST` | `/api/collections/[id]/links` | Add links to a collection |
+| `DELETE` | `/api/collections/[id]/links/[linkId]` | Remove link from collection |
+| `GET` | `/api/collections/[id]/public` | Get public collection (no auth) |
+| `POST` | `/api/shares` | Share a link or collection with a user |
+| `GET` | `/api/shares` | List items shared with me |
+| `PATCH` | `/api/shares/[id]` | Mark share as seen |
+
+---
+
+## 3. Database
+
+**Engine**: SQLite via `better-sqlite3` + Drizzle ORM (simple, zero-config, single file)
+
+---
+
+## Data Model
+
+### `users`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | integer | PK, auto-increment |
+| `email` | text | NOT NULL, UNIQUE |
+| `googleId` | text | NOT NULL, UNIQUE |
+| `name` | text | From Google profile |
+| `image` | text | Google avatar URL |
+| `apiToken` | text | NOT NULL, UNIQUE — UUID for API auth |
+| `createdAt` | integer | ms since epoch |
+
+### `links`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | integer | PK, auto-increment |
+| `userId` | integer | FK → users.id, NOT NULL |
+| `url` | text | NOT NULL |
+| `title` | text | Extracted via unfurl.js |
+| `description` | text | From og:description |
+| `imageUrl` | text | From og:image |
+| `siteName` | text | From og:site_name |
+| `author` | text | From og:article:author |
+| `favicon` | text | Site favicon URL |
+| `isRead` | integer | 0 or 1, default 0 |
+| `savedAt` | integer | NOT NULL, ms since epoch |
+| `createdAt` | integer | NOT NULL, ms since epoch |
+
+**Unique index**: `(url, userId)` — same user can't save the same link twice.
+
+### `collections`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | integer | PK, auto-increment |
+| `userId` | integer | FK → users.id, NOT NULL (creator) |
+| `title` | text | NOT NULL — e.g. "React Deep Dives" |
+| `description` | text | Optional |
+| `slug` | text | UNIQUE — for public URL `/c/react-deep-dives` |
+| `isPublic` | integer | 0 or 1, default 0 |
+| `createdAt` | integer | ms since epoch |
+| `updatedAt` | integer | ms since epoch |
+
+### `collection_links` (join table)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | integer | PK, auto-increment |
+| `collectionId` | integer | FK → collections.id, NOT NULL |
+| `linkId` | integer | FK → links.id, NOT NULL |
+| `sortOrder` | integer | For manual ordering |
+| `addedAt` | integer | ms since epoch |
+
+**Unique index**: `(collectionId, linkId)` — no duplicates within a collection.
+
+### `shares` (user-to-user sharing)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | integer | PK, auto-increment |
+| `fromUserId` | integer | FK → users.id (sender) |
+| `toEmail` | text | NOT NULL — recipient's email |
+| `toUserId` | integer | FK → users.id, nullable (resolved when recipient signs up) |
+| `linkId` | integer | FK → links.id, nullable |
+| `collectionId` | integer | FK → collections.id, nullable |
+| `message` | text | Optional note from sender |
+| `seen` | integer | 0 or 1, default 0 |
+| `createdAt` | integer | ms since epoch |
+
+**Constraint**: Either `linkId` OR `collectionId` is set, never both.
+
+**Design note**: `toEmail` is the primary target. If the recipient already has an account, `toUserId` is set immediately. If they don't have an account yet, `toUserId` is null — when they sign up with that email, we resolve it and they see the shared items.
+
+---
+
+## Entity Relationship Diagram
+
+```
+users ──────┬──── links
+            │       │
+            │       ├──── collection_links ──── collections
+            │       │                              │
+            │       └──── shares ──────────────────┘
+            │               │
+            └───────────────┘ (fromUserId, toUserId)
+```
+
+---
+
+## How Sharing Works
+
+### Public sharing (anyone with the URL)
+1. User creates a collection and toggles `isPublic = true`
+2. System generates a `slug` from the title (e.g. "react-deep-dives")
+3. Collection is viewable at `/c/react-deep-dives` — no login required
+4. User can copy and share this URL anywhere
+
+### User-to-user sharing
+1. User selects a link or collection → clicks "Share"
+2. Enters recipient's email + optional message
+3. Creates a row in `shares` table
+4. If recipient has an account → appears in their `/shared` page immediately
+5. If recipient doesn't have an account → when they sign up with that email, pending shares resolve automatically
 
 ---
 
 ## Tech Stack
 
-- **Next.js 15** (App Router, TypeScript, Tailwind CSS)
-- **SQLite** via `better-sqlite3` + **Drizzle ORM**
-- **unfurl.js** for server-side Open Graph / Twitter Card metadata extraction
-- **date-fns** for week grouping calculations
-- **Custom email OTP auth** + **Resend** for passwordless authentication (no NextAuth)
-- **Chrome Extension** (Manifest V3)
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 15, React 19, TypeScript, Tailwind CSS |
+| Backend | Next.js API Routes (Node.js runtime) |
+| Database | SQLite via better-sqlite3 + Drizzle ORM |
+| Auth | Google Sign-In (ID token verified with `jose`) |
+| Metadata | `unfurl.js` for Open Graph / Twitter Card extraction |
+| Email (optional) | Resend — for share notifications |
+| Extension | Chrome Manifest V3 + Chrome Identity API |
+
+---
+
+## Step-by-Step Build Order
+
+### Phase 1: Foundation
+1. Initialize Next.js project with TypeScript + Tailwind
+2. Set up SQLite + Drizzle ORM
+3. Define all tables in schema
+4. Run `db:push` to create the database
+
+### Phase 2: Auth
+5. Create Google OAuth credentials (Google Cloud Console)
+6. Build `POST /api/auth/google` — verify ID token, find/create user, return apiToken
+7. Build login page with "Sign in with Google" button (GSI SDK)
+8. Store apiToken in localStorage, send as Bearer token
+9. Build `resolveAuth()` utility (check Bearer token against DB)
+
+### Phase 3: Core — Save & View Links
+10. Build `POST /api/links` — save URL + extract metadata via unfurl.js
+11. Build `GET /api/links` — return user's links sorted by savedAt
+12. Build `DELETE /api/links/[id]` — delete a link
+13. Build `PATCH /api/links/[id]` — mark as read
+14. Build dashboard page — display saved links grouped by week
+
+### Phase 4: Chrome Extension
+15. Create Manifest V3 extension with `chrome.identity` for Google auth
+16. Build popup: "Sign in" state → "Save this page" state
+17. Extension calls `POST /api/auth/google` with the ID token to get apiToken
+18. Extension calls `POST /api/links` with the apiToken to save pages
+19. Store apiToken in `chrome.storage.local`
+
+### Phase 5: Collections
+20. Build `POST /api/collections` — create a named collection
+21. Build `GET /api/collections` — list user's collections
+22. Build `POST /api/collections/[id]/links` — add links to collection
+23. Build `DELETE /api/collections/[id]/links/[linkId]` — remove link
+24. Build `PATCH /api/collections/[id]` — rename, toggle public
+25. Build collections UI pages
+26. Build public collection page at `/c/[slug]` (no auth)
+
+### Phase 6: Sharing
+27. Build `POST /api/shares` — share a link or collection with an email
+28. Build `GET /api/shares` — list items shared with me
+29. Build `PATCH /api/shares/[id]` — mark as seen
+30. Build "Shared with me" page
+31. Add share resolution on signup (resolve pending shares by email)
+32. Optional: send email notification via Resend when someone shares with you
+
+### Phase 7: Polish
+33. Landing page
+34. Loading states + error boundaries
+35. Keyboard navigation
+36. Mobile responsive
+37. Extension icons + branding
 
 ---
 
 ## Project Structure
 
 ```
-nightstand/
-├── PLAN.md
-├── IDEA.md
-├── .gitignore
-│
-├── web/                              # Next.js app
+project/
+├── web/
 │   ├── src/
 │   │   ├── app/
-│   │   │   ├── layout.tsx            # Root layout (fonts, CSS only)
-│   │   │   ├── (landing)/
-│   │   │   │   ├── layout.tsx        # Minimal layout
-│   │   │   │   └── page.tsx          # Landing page
-│   │   │   ├── dashboard/
-│   │   │   │   ├── layout.tsx        # Auth-aware layout
-│   │   │   │   └── page.tsx          # Article list + API token
-│   │   │   ├── middleware.ts         # Auth guard: /dashboard → / when unauthenticated
+│   │   │   ├── layout.tsx
+│   │   │   ├── (landing)/page.tsx
+│   │   │   ├── login/page.tsx
+│   │   │   ├── dashboard/page.tsx
+│   │   │   ├── collections/
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── [id]/page.tsx
+│   │   │   ├── shared/page.tsx
+│   │   │   ├── c/[slug]/page.tsx          ← public collection
 │   │   │   └── api/
-│   │   │       ├── articles/
-│   │   │       │   └── route.ts      # GET + POST articles
-│   │   │       ├── articles/[id]/
-│   │   │       │   └── route.ts      # DELETE article
-│   │   │       └── auth/
-│   │   │           ├── send-otp/
-│   │   │           │   └── route.ts  # POST: generate & email OTP
-│   │   │           ├── verify-otp/
-│   │   │           │   └── route.ts  # POST: verify OTP, create session
-│   │   │           └── logout/
-│   │   │               └── route.ts  # POST: clear session cookie
+│   │   │       ├── auth/google/route.ts
+│   │   │       ├── auth/logout/route.ts
+│   │   │       ├── links/route.ts
+│   │   │       ├── links/[id]/route.ts
+│   │   │       ├── collections/route.ts
+│   │   │       ├── collections/[id]/route.ts
+│   │   │       ├── collections/[id]/links/route.ts
+│   │   │       └── shares/route.ts
 │   │   ├── db/
-│   │   │   ├── schema.ts            # Drizzle schema (users, articles, otp_codes)
-│   │   │   └── index.ts             # DB connection
+│   │   │   ├── schema.ts
+│   │   │   └── index.ts
 │   │   ├── lib/
-│   │   │   ├── unfurl.ts            # Metadata extraction wrapper
-│   │   │   ├── week-utils.ts        # Week grouping helpers
-│   │   │   ├── session.ts           # JWT session helpers (sign, verify, cookie)
-│   │   │   └── email.ts             # OTP email template via Resend
-│   │   ├── hooks/
-│   │   │   └── use-keyboard-nav.ts  # Keyboard navigation hook
+│   │   │   ├── auth.ts                    ← resolveAuth()
+│   │   │   ├── unfurl.ts                  ← metadata extraction
+│   │   │   └── slug.ts                    ← slug generation
 │   │   └── components/
-│   │       ├── article-card.tsx
-│   │       ├── article-list.tsx      # Server Component
-│   │       ├── week-group.tsx
-│   │       ├── auth-header.tsx
-│   │       ├── dashboard-shell.tsx   # Client wrapper: keyboard state + focus
-│   │       ├── keyboard-help.tsx     # ? shortcut overlay
-│   │       ├── toast.tsx             # Action feedback toasts
-│   │       └── delete-button.tsx
+│   │       ├── link-card.tsx
+│   │       ├── link-list.tsx
+│   │       ├── collection-card.tsx
+│   │       ├── share-dialog.tsx
+│   │       └── auth-button.tsx
 │   ├── drizzle.config.ts
-│   └── .env.local                    # RESEND_API_KEY, JWT_SECRET (not committed)
+│   └── .env.local
 │
-├── extension/                        # Chrome Extension (Manifest V3)
+├── extension/
 │   ├── manifest.json
-│   ├── popup/                        # Save UI
-│   ├── background/service-worker.js
-│   └── options/                      # API URL + token configuration
+│   ├── popup/
+│   │   ├── popup.html
+│   │   └── popup.js
+│   ├── background/
+│   │   └── service-worker.js
+│   └── icons/
+│
+└── PLAN.md
 ```
 
 ---
 
-## Database Schema
+## Environment Variables
 
-### `users` table
-
-| Column    | Type    | Notes                        |
-|-----------|---------|------------------------------|
-| id        | integer | PK, auto-increment           |
-| email     | text    | NOT NULL, UNIQUE             |
-| name      | text    | nullable                     |
-| image     | text    | nullable                     |
-| apiToken  | text    | NOT NULL, UNIQUE (UUID)      |
-| createdAt | integer | NOT NULL (ms since epoch)    |
-
-### `articles` table
-
-| Column      | Type    | Notes                                              |
-|-------------|---------|-----------------------------------------------------|
-| id          | integer | PK, auto-increment                                  |
-| userId      | integer | FK → users.id                                       |
-| url         | text    | NOT NULL                                            |
-| tweetUrl    | text    | nullable — source tweet or context                  |
-| title       | text    | From og:title                                       |
-| author      | text    | From og:article:author / twitter:creator            |
-| description | text    | From og:description                                 |
-| imageUrl    | text    | From og:image                                       |
-| siteName    | text    | From og:site_name                                   |
-| isRead      | integer | 0 or 1 — for mark-as-read feature                  |
-| openedAt    | integer | nullable — timestamp when user clicked through      |
-| savedAt     | integer | NOT NULL (ms since epoch) — used for weekly grouping|
-| createdAt   | integer | NOT NULL (ms since epoch)                           |
-
-Unique index on `(url, userId)` — per-user dedup.
-
-### `otp_codes` table
-
-| Column    | Type    | Notes                                |
-|-----------|---------|--------------------------------------|
-| id        | integer | PK, auto-increment                   |
-| email     | text    | NOT NULL                             |
-| code      | text    | NOT NULL (6-digit numeric string)    |
-| expiresAt | integer | NOT NULL (ms since epoch, 10 min TTL)|
-| used      | integer | 0 or 1 — prevent reuse               |
-| createdAt | integer | NOT NULL                             |
-
----
-
-## API Design
-
-### `POST /api/articles`
-- **Auth**: `Authorization: Bearer <user-api-token>`
-- **Body**: `{ url, tweetUrl? }`
-- Checks for duplicate (same URL + same user), calls `unfurl(url)` for metadata, inserts row
-- Returns `{ status: 'created' | 'duplicate', article }`
-- CORS headers for extension origin
-
-### `GET /api/articles`
-- **Auth**: Session (cookie) or Bearer token
-- Returns user's articles ordered by `savedAt` desc
-- Optional `page` + `limit` params
-- Weekly grouping computed on the frontend
-
-### `DELETE /api/articles/[id]`
-- **Auth**: Session or Bearer token
-- Validates article belongs to authenticated user
-- Returns 200 on success
-
----
-
-## Landing Page
-
-### Content
-
-**Headline:**
-Your reading pile, but it actually works.
-
-**Body:**
-
-Every week you find articles worth reading. Blog posts linked in threads. Essays on Substack. Deep dives someone shared on Twitter. You bookmark them. You forget them. By the weekend, they're gone — buried in a graveyard of good intentions.
-
-Nightstand is where you put things you intend to come back to. One click from the browser extension. Title, author, and preview pulled automatically. Organized by the week you saved it. When the weekend comes, your reading list is sitting right where you left it.
-
-No feeds to scroll. No algorithm deciding what's worth your time. No onboarding. No tracking. No ads. Just the articles you picked, grouped by week, on your nightstand.
-
-**CTA:**
-Get started — Sign in with your email. Install the extension. Save your first article.
-
-**Colophon:**
-Built with Next.js. Open source on GitHub.
-
-### Layout
-
-- Dark background (`bg-black`), centered text, `max-w-xl` (~576px)
-- Headline: `text-xl`/`text-2xl`, `font-semibold`, white
-- Body: `text-sm`/`text-base`, `text-zinc-400`, `leading-relaxed`
-- Font: Geist Sans
-
----
-
-## Email OTP Auth
-
-Custom passwordless auth — no NextAuth, no OAuth. User stays on the same page throughout.
-
-### Flow
-1. User enters email → clicks "Send me a one-time password"
-2. Server generates a 6-digit code, stores it in `otp_codes` with 10-minute expiry, emails it via Resend
-3. Page transitions to OTP input — user enters the 6-digit code → clicks "Verify OTP"
-4. Server verifies code is valid + not expired + not used. Marks it as used.
-5. If no user exists for that email → auto-create user with a generated UUID `apiToken`
-6. Server creates a signed JWT, sets it as an `HttpOnly` session cookie → redirects to `/dashboard`
-7. Hint text: "If you don't see anything after 2 minutes, we likely couldn't match the provided email to an account."
-
-### Session management
-- Signed JWT cookie (`nightstand-session`), `HttpOnly`, `SameSite=Lax`, `Secure` in production
-- JWT payload: `{ userId, email, iat, exp }` — expires in 30 days
-- `lib/session.ts` exports: `createSession(userId, email)`, `getSession(req)`, `clearSession()`
-- Middleware reads the cookie to guard `/dashboard`
-
-### API routes
-- `POST /api/auth/send-otp` — body: `{ email }`. Generate 6-digit code, store, email via Resend. Rate limit: max 5 OTPs per email per hour.
-- `POST /api/auth/verify-otp` — body: `{ email, code }`. Verify, create/find user, set session cookie. Return `{ success: true }`.
-- `POST /api/auth/logout` — clear session cookie.
-
-### Environment variables
-- `RESEND_API_KEY` — from resend.com (free tier: 100 emails/day)
-- `JWT_SECRET` — for signing session JWTs
-
----
-
-## Keyboard Navigation
-
-Full shortcut system for the dashboard. Arrow keys for navigation, ⌘ modifier for actions.
-
-### Navigation (bare keys)
-
-| Key | Action |
-|-----|--------|
-| `↑` | Previous article |
-| `↓` | Next article |
-| `⇧ ↑` | Jump 5 articles up |
-| `⇧ ↓` | Jump 5 articles down |
-| `1` `2` `3` ... | Jump to week group by number (1 = most recent) |
-| `←` | Previous week group |
-| `→` | Next week group |
-| `Escape` | Clear focus / close overlay |
-
-### Actions (⌘ modifier)
-
-| Key | Action |
-|-----|--------|
-| `⌘ Enter` | Open article URL in new tab |
-| `⌘ C` | Copy article URL to clipboard |
-| `⌘ Backspace` | Delete article |
-| `⌘ F` | Focus search input (reserved for future) |
-
-### Actions (bare key)
-
-| Key | Action |
-|-----|--------|
-| `x` | Toggle "mark as read" |
-| `t` | Open source tweet (if tweetUrl exists) |
-| `?` | Show/hide keyboard shortcut help overlay |
-
-### Focus state
-- `focusedIndex` tracks the active article (flattened across weeks)
-- Active card gets `bg-zinc-800/60` (dark) / `bg-zinc-100` (light) background tint
-- `scrollIntoView({ block: 'nearest', behavior: 'smooth' })` on focus change
-- No focus on page load — first `↓` focuses the first article
-- All bare-key shortcuts disabled when an input is focused
-- Footer hint: "Press ? for keyboard shortcuts"
-- Action feedback via auto-dismissing toast (2 seconds)
-
----
-
-## Current Status
-
-### Completed
-- [x] Phase 1: Next.js app with TypeScript + Tailwind
-- [x] Phase 1: SQLite + Drizzle ORM schema + connection
-- [x] Phase 1: `unfurl.js` metadata extraction
-- [x] Phase 2: POST + GET API endpoints with auth, dedup, CORS
-- [x] Phase 3: Chrome extension (Manifest V3) — popup saves current URL
-- [x] Phase 4: Weekly-grouped article list UI
-- [x] Phase 4: Google OAuth + per-user API tokens
-- [x] Bug fix: Unauthenticated users no longer see all articles
-- [x] Bug fix: Copy button shows "Copied!" feedback
-- [x] Feature: Delete article (DELETE endpoint + delete button)
-
-### Next Up
-- [ ] **Landing page** — Create `/` route with Nightstand copy, move app to `/dashboard`
-- [ ] **Rename** — Update all references from "X Article Curator" to "Nightstand"
-- [ ] **Email OTP auth** — Replace Google OAuth with email one-time passwords via Resend
-- [ ] **Keyboard navigation** — Full shortcut system with focus state + help overlay
-- [ ] **Mark as read** — `isRead` column + toggle on article cards
-- [ ] **Loading state** — `loading.tsx` for dashboard Suspense boundary
-- [ ] **Error boundary** — `error.tsx` for graceful error handling
-
-### Future Ideas
-- [ ] Estimated reading time on article cards
-- [ ] Weekly email digest (Friday evening: "You saved 6 articles this week")
-- [ ] Full-text search (SQLite FTS5)
-- [ ] Archive instead of delete
-- [ ] Tags / collections
-- [ ] Focus mode (one unread article at a time)
-- [ ] Click-through tracking for gamification stats
-- [ ] Weekly completion rate + streaks
-
----
-
-## Setup & Verification
-
-1. In `web/`: `npm install && npm run db:push && npm run dev`
-2. Create `web/.env.local` with:
-   ```
-   RESEND_API_KEY=re_xxxxx
-   JWT_SECRET=your-random-secret
-   ```
-3. Open `http://localhost:3000` — see landing page
-4. Enter email → receive OTP → enter code → land on `/dashboard`
-5. Load `extension/` as unpacked in Chrome
-6. Open extension options, set API URL + paste your API token from dashboard
-7. Navigate to any article, click extension, click Save → appears on dashboard
-8. Test keyboard: `↓` to focus, `⌘ Enter` to open, `?` for help
+```
+GOOGLE_CLIENT_ID=               # Server-side token verification
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=   # Client-side GSI SDK
+API_SECRET_KEY=                 # Global admin API key (optional)
+RESEND_API_KEY=                 # For share notification emails (optional)
+```

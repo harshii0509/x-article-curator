@@ -2,17 +2,24 @@ import type { ComponentPropsWithoutRef } from "react";
 
 import type { InferSelectModel } from "drizzle-orm";
 
-import { articles } from "@/db/schema";
+import { links } from "@/db/schema";
 import { DeleteButton } from "@/components/delete-button";
+import { MarkAsReadButton } from "@/components/mark-as-read-button";
 
-type Article = InferSelectModel<typeof articles>;
+type Link = InferSelectModel<typeof links>;
 
-interface ArticleCardProps extends ComponentPropsWithoutRef<"article"> {
-  article: Article;
+interface LinkCardProps extends ComponentPropsWithoutRef<"article"> {
+  link: Link;
+  readonly?: boolean;
 }
 
-export function ArticleCard({ article, className, ...props }: ArticleCardProps) {
-  const read = Boolean(article.isRead);
+export function LinkCard({
+  link,
+  className,
+  readonly = false,
+  ...props
+}: LinkCardProps) {
+  const read = Boolean(link.isRead);
 
   return (
     <article
@@ -21,45 +28,50 @@ export function ArticleCard({ article, className, ...props }: ArticleCardProps) 
       } ${className ?? ""}`}
       {...props}
     >
-      {article.imageUrl ? (
+      {link.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={article.imageUrl}
-          alt={article.title ?? ""}
+          src={link.imageUrl}
+          alt={link.title ?? ""}
           loading="lazy"
           className="h-20 w-24 flex-none rounded-md object-cover"
         />
       ) : (
         <div className="flex h-20 w-24 flex-none items-center justify-center rounded-md bg-zinc-100 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-          {article.siteName ?? "Link"}
+          {link.siteName ?? "Link"}
         </div>
       )}
       <div className="min-w-0 flex-1 space-y-1.5">
         <div className="flex items-start justify-between gap-3">
           <div className="text-xs font-medium uppercase tracking-[0.08em] text-zinc-500 dark:text-zinc-400">
-            {article.siteName ?? "Saved link"}
+            {link.siteName ?? "Saved link"}
           </div>
-          {article.id != null ? <DeleteButton articleId={article.id} /> : null}
+          {!readonly && link.id != null ? (
+            <div className="flex items-center gap-1.5">
+              <MarkAsReadButton linkId={link.id} isRead={read} />
+              <DeleteButton linkId={link.id} />
+            </div>
+          ) : null}
         </div>
         <a
-          href={article.url}
+          href={link.url}
           target="_blank"
           rel="noreferrer"
           className="line-clamp-2 text-sm font-semibold text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
         >
-          {article.title ?? article.url}
+          {link.title ?? link.url}
         </a>
-        {article.description ? (
+        {link.description ? (
           <p className="line-clamp-2 text-xs text-zinc-600 dark:text-zinc-400">
-            {article.description}
+            {link.description}
           </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-          {article.author ? <span>{article.author}</span> : null}
-          {article.author && article.tweetUrl ? <span>•</span> : null}
-          {article.tweetUrl ? (
+          {link.author ? <span>{link.author}</span> : null}
+          {link.author && link.tweetUrl ? <span>•</span> : null}
+          {link.tweetUrl ? (
             <a
-              href={article.tweetUrl}
+              href={link.tweetUrl}
               target="_blank"
               rel="noreferrer"
               className="underline-offset-2 hover:underline"
@@ -67,7 +79,6 @@ export function ArticleCard({ article, className, ...props }: ArticleCardProps) 
               View tweet
             </a>
           ) : null}
-          {read ? <span>• Read</span> : null}
         </div>
       </div>
     </article>

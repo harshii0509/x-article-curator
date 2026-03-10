@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { articles } from "@/db/schema";
+import { links } from "@/db/schema";
 import { unfurlUrl } from "@/lib/unfurl";
 import { resolveAuth } from "@/lib/auth";
 
@@ -66,17 +66,17 @@ export async function GET(request: Request) {
     );
   }
 
-  const allArticles = await db
+  const allLinks = await db
     .select()
-    .from(articles)
-    .where(eq(articles.userId, auth.user.id))
-    .orderBy(desc(articles.savedAt))
+    .from(links)
+    .where(eq(links.userId, auth.user.id))
+    .orderBy(desc(links.savedAt))
     .limit(limit)
     .offset(offset);
 
   return withCors(
     {
-      articles: allArticles,
+        links: allLinks,
       page,
       limit,
     },
@@ -152,11 +152,11 @@ export async function POST(request: Request) {
 
   const userId = auth.user.id;
 
-  const where = and(eq(articles.url, url), eq(articles.userId, userId));
+  const where = and(eq(links.url, url), eq(links.userId, userId));
 
   const existing = await db
     .select()
-    .from(articles)
+    .from(links)
     .where(where)
     .limit(1);
 
@@ -164,7 +164,7 @@ export async function POST(request: Request) {
     return withCors(
       {
         status: "duplicate" as const,
-        article: existing[0],
+        link: existing[0],
       },
       {
         status: 200,
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
 
   const now = Date.now();
 
-  const [inserted] = await db.insert(articles).values({
+  const [inserted] = await db.insert(links).values({
     url,
     tweetUrl: tweetUrl ?? null,
     userId,
@@ -193,8 +193,8 @@ export async function POST(request: Request) {
 
   return withCors(
     {
-      status: "created" as const,
-      article: inserted,
+        status: "created" as const,
+        link: inserted,
     },
     {
       status: 201,

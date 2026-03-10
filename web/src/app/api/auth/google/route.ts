@@ -9,7 +9,7 @@ import {
 } from "jose";
 
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, shares } from "@/db/schema";
 
 export const runtime = "nodejs";
 
@@ -132,6 +132,12 @@ export async function POST(request: Request) {
       })
       .returning();
 
+    // Resolve any pending shares for this email.
+    await db
+      .update(shares)
+      .set({ toUserId: inserted.id })
+      .where(eq(shares.toEmail, email));
+
     return NextResponse.json({
       ok: true,
       user: {
@@ -140,6 +146,7 @@ export async function POST(request: Request) {
         apiToken: inserted.apiToken,
         name: inserted.name,
         image: inserted.image,
+        username: inserted.username,
       },
     });
   }
@@ -155,14 +162,21 @@ export async function POST(request: Request) {
     .where(eq(users.id, user.id))
     .returning();
 
+  // Ensure shares are associated with this user if any exist for their email.
+  await db
+    .update(shares)
+    .set({ toUserId: updated.id })
+    .where(eq(shares.toEmail, updated.email));
+
   return NextResponse.json({
     ok: true,
     user: {
-      id: updated.id,
-      email: updated.email,
-      apiToken: updated.apiToken,
-      name: updated.name,
-      image: updated.image,
+        id: updated.id,
+        email: updated.email,
+        apiToken: updated.apiToken,
+        name: updated.name,
+        image: updated.image,
+        username: updated.username,
     },
   });
 }

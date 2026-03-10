@@ -1,19 +1,19 @@
 import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { articles } from "@/db/schema";
+import { links } from "@/db/schema";
 import { unfurlUrl } from "@/lib/unfurl";
 
 async function main() {
   const rows = await db
     .select()
-    .from(articles)
+    .from(links)
     .where(
       and(
-        isNull(articles.title),
-        isNull(articles.description),
-        isNull(articles.imageUrl),
-        isNull(articles.siteName),
+        isNull(links.title),
+        isNull(links.description),
+        isNull(links.imageUrl),
+        isNull(links.siteName),
       ),
     );
 
@@ -22,7 +22,7 @@ async function main() {
     return;
   }
 
-  console.log(`Backfilling metadata for ${rows.length} articles...\n`);
+  console.log(`Backfilling metadata for ${rows.length} links...\n`);
 
   for (const row of rows) {
     console.log(`→ ${row.id}: ${row.url}`);
@@ -42,7 +42,7 @@ async function main() {
       }
 
       await db
-        .update(articles)
+        .update(links)
         .set({
           title: metadata.title ?? row.title,
           description: metadata.description ?? row.description,
@@ -50,7 +50,7 @@ async function main() {
           siteName: metadata.siteName ?? row.siteName,
           author: metadata.author ?? row.author,
         })
-        .where(eq(articles.id, row.id));
+        .where(eq(links.id, row.id));
 
       console.log("   Updated.");
     } catch (error) {

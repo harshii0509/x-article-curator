@@ -41,7 +41,7 @@ export default function LandingPage() {
 
         <div className="mt-6">
           <Link
-            href="/dashboard"
+            href="/login"
             className="inline-flex items-center rounded-sm bg-[#2A2A28] px-2 py-2 text-[13px] font-medium text-[#EDEDED] hover:bg-[#343431]"
             style={{ fontFamily: "var(--font-inter)", lineHeight: "120%" }}
           >

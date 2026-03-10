@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { articles } from "@/db/schema";
+import { links } from "@/db/schema";
 import { resolveAuth } from "@/lib/auth";
 
 const corsHeaders = {
@@ -28,12 +28,7 @@ export async function DELETE(request: Request) {
 
   const idNum = Number(idSegment);
   if (!Number.isInteger(idNum) || idNum <= 0) {
-    return withCors(
-      { error: `Invalid article id: ${idSegment}` },
-      {
-        status: 400,
-      },
-    );
+    return withCors({ error: `Invalid link id: ${idSegment}` }, { status: 400 });
   }
 
   let auth;
@@ -59,8 +54,8 @@ export async function DELETE(request: Request) {
 
   const existing = await db
     .select()
-    .from(articles)
-    .where(eq(articles.id, idNum))
+    .from(links)
+    .where(eq(links.id, idNum))
     .limit(1);
 
   if (!existing.length) {
@@ -72,10 +67,10 @@ export async function DELETE(request: Request) {
     );
   }
 
-  const article = existing[0];
+  const link = existing[0];
 
   // Only allow delete if it belongs to this user or is unowned (legacy rows).
-  if (article.userId !== null && article.userId !== auth.user.id) {
+  if (link.userId !== null && link.userId !== auth.user.id) {
     return withCors(
       { error: "Forbidden" },
       {
@@ -84,7 +79,7 @@ export async function DELETE(request: Request) {
     );
   }
 
-  await db.delete(articles).where(eq(articles.id, idNum));
+  await db.delete(links).where(eq(links.id, idNum));
 
   return withCors({ ok: true }, { status: 200 });
 }
@@ -96,10 +91,7 @@ export async function PATCH(request: Request) {
 
   const idNum = Number(idSegment);
   if (!Number.isInteger(idNum) || idNum <= 0) {
-    return withCors(
-      { error: `Invalid article id: ${idSegment}` },
-      { status: 400 },
-    );
+    return withCors({ error: `Invalid link id: ${idSegment}` }, { status: 400 });
   }
 
   let auth;
@@ -118,32 +110,32 @@ export async function PATCH(request: Request) {
 
   const existing = await db
     .select()
-    .from(articles)
-    .where(eq(articles.id, idNum))
+    .from(links)
+    .where(eq(links.id, idNum))
     .limit(1);
 
   if (!existing.length) {
     return withCors({ error: "Not found" }, { status: 404 });
   }
 
-  const article = existing[0];
+  const link = existing[0];
 
-  if (article.userId !== null && article.userId !== auth.user.id) {
+  if (link.userId !== null && link.userId !== auth.user.id) {
     return withCors({ error: "Forbidden" }, { status: 403 });
   }
 
-  const nextIsRead = article.isRead ? 0 : 1;
+  const nextIsRead = link.isRead ? 0 : 1;
 
   const [updated] = await db
-    .update(articles)
+    .update(links)
     .set({ isRead: nextIsRead })
-    .where(eq(articles.id, idNum))
+    .where(eq(links.id, idNum))
     .returning();
 
   return withCors(
     {
       ok: true,
-      article: updated,
+      link: updated,
     },
     { status: 200 },
   );
