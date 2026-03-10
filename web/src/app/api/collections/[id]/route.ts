@@ -5,22 +5,7 @@ import { db } from "@/db";
 import { collections, collectionLinks, links, shares } from "@/db/schema";
 import { resolveAuth } from "@/lib/auth";
 import { slugify } from "@/lib/slug";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,PATCH,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
+import { withCors, optionsResponse } from "@/lib/cors";
 
 function parseId(request: Request): number | null {
   const url = new URL(request.url);
@@ -37,23 +22,23 @@ function parseId(request: Request): number | null {
 export async function GET(request: Request) {
   const idNum = parseId(request);
   if (!idNum) {
-    return withCors({ error: "Invalid collection id" }, { status: 400 });
+    return withCors({ error: "Invalid collection id" }, { status: 400 }, request);
   }
 
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type !== "user") {
-    return withCors({ error: "Unauthorized" }, { status: 401 });
+    return withCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   const [collection] = await db
@@ -68,7 +53,7 @@ export async function GET(request: Request) {
     .limit(1);
 
   if (!collection) {
-    return withCors({ error: "Not found" }, { status: 404 });
+    return withCors({ error: "Not found" }, { status: 404 }, request);
   }
 
   const items = await db
@@ -87,29 +72,30 @@ export async function GET(request: Request) {
       items,
     },
     { status: 200 },
+    request,
   );
 }
 
 export async function PATCH(request: Request) {
   const idNum = parseId(request);
   if (!idNum) {
-    return withCors({ error: "Invalid collection id" }, { status: 400 });
+    return withCors({ error: "Invalid collection id" }, { status: 400 }, request);
   }
 
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type !== "user") {
-    return withCors({ error: "Unauthorized" }, { status: 401 });
+    return withCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   const [existing] = await db
@@ -124,7 +110,7 @@ export async function PATCH(request: Request) {
     .limit(1);
 
   if (!existing) {
-    return withCors({ error: "Not found" }, { status: 404 });
+    return withCors({ error: "Not found" }, { status: 404 }, request);
   }
 
   let body: {
@@ -135,7 +121,7 @@ export async function PATCH(request: Request) {
   try {
     body = (await request.json()) ?? {};
   } catch {
-    return withCors({ error: "Invalid JSON body" }, { status: 400 });
+    return withCors({ error: "Invalid JSON body" }, { status: 400 }, request);
   }
 
   const update: Partial<typeof existing> = {};
@@ -166,7 +152,7 @@ export async function PATCH(request: Request) {
   }
 
   if (Object.keys(update).length === 0) {
-    return withCors({ collection: existing }, { status: 200 });
+    return withCors({ collection: existing }, { status: 200 }, request);
   }
 
   (update as any).updatedAt = Date.now();
@@ -177,29 +163,29 @@ export async function PATCH(request: Request) {
     .where(eq(collections.id, existing.id))
     .returning();
 
-  return withCors({ collection: updated }, { status: 200 });
+  return withCors({ collection: updated }, { status: 200 }, request);
 }
 
 export async function DELETE(request: Request) {
   const idNum = parseId(request);
   if (!idNum) {
-    return withCors({ error: "Invalid collection id" }, { status: 400 });
+    return withCors({ error: "Invalid collection id" }, { status: 400 }, request);
   }
 
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type !== "user") {
-    return withCors({ error: "Unauthorized" }, { status: 401 });
+    return withCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   const [existing] = await db
@@ -214,20 +200,16 @@ export async function DELETE(request: Request) {
     .limit(1);
 
   if (!existing) {
-    return withCors({ error: "Not found" }, { status: 404 });
+    return withCors({ error: "Not found" }, { status: 404 }, request);
   }
 
   await db.delete(shares).where(eq(shares.collectionId, idNum));
   await db.delete(collectionLinks).where(eq(collectionLinks.collectionId, idNum));
   await db.delete(collections).where(eq(collections.id, idNum));
 
-  return withCors({ ok: true }, { status: 200 });
+  return withCors({ ok: true }, { status: 200 }, request);
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-

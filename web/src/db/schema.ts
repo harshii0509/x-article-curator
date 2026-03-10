@@ -7,6 +7,7 @@ export const users = sqliteTable("users", {
   name: text("name"),
   image: text("image"),
   apiToken: text("api_token").notNull().unique(),
+  tokenExpiresAt: integer("token_expires_at", { mode: "number" }),
   username: text("username").unique(),
   createdAt: integer("created_at", { mode: "number" }).notNull(),
 });

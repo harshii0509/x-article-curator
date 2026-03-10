@@ -4,33 +4,20 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { publicWeeks, users } from "@/db/schema";
 import { resolveAuth } from "@/lib/auth";
+import { withCors, optionsResponse } from "@/lib/cors";
 
 export const runtime = "nodejs";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,PATCH,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
 
 export async function GET(request: Request) {
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
+      { error: "Internal server error" },
       { status: 500 },
+      request,
     );
   }
 
@@ -38,6 +25,7 @@ export async function GET(request: Request) {
     return withCors(
       { error: "Authentication required" },
       { status: 401 },
+      request,
     );
   }
 
@@ -51,6 +39,7 @@ export async function GET(request: Request) {
       weeks: rows,
     },
     { status: 200 },
+    request,
   );
 }
 
@@ -63,6 +52,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "Invalid JSON body" },
       { status: 400 },
+      request,
     );
   }
 
@@ -72,6 +62,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "Invalid `weekStart`" },
       { status: 400 },
+      request,
     );
   }
 
@@ -79,6 +70,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "Invalid `isPublic`" },
       { status: 400 },
+      request,
     );
   }
 
@@ -86,9 +78,11 @@ export async function PATCH(request: Request) {
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
+      { error: "Internal server error" },
       { status: 500 },
+      request,
     );
   }
 
@@ -96,6 +90,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "Authentication required" },
       { status: 401 },
+      request,
     );
   }
 
@@ -111,6 +106,7 @@ export async function PATCH(request: Request) {
       return withCors(
         { error: "username_required" },
         { status: 400 },
+        request,
       );
     }
   }
@@ -163,13 +159,10 @@ export async function PATCH(request: Request) {
       week: row,
     },
     { status: 200 },
+    request,
   );
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-

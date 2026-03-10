@@ -4,24 +4,10 @@ import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { resolveAuth } from "@/lib/auth";
+import { withCors, optionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,PATCH,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
 
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
 
@@ -29,7 +15,22 @@ function isValidUsername(value: string) {
   return USERNAME_REGEX.test(value);
 }
 
+const USERNAME_CHECK_RATE = { windowMs: 60_000, maxRequests: 30 };
+
 export async function GET(request: Request) {
+  const ip = getClientIP(request);
+  const rl = checkRateLimit(`username-check:${ip}`, USERNAME_CHECK_RATE);
+  if (!rl.allowed) {
+    return withCors(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.retryAfterMs ?? 1000) / 1000)) },
+      },
+      request,
+    );
+  }
+
   const url = new URL(request.url);
   const check = url.searchParams.get("check");
 
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
     return withCors(
       { error: "Missing `check` query parameter" },
       { status: 400 },
+      request,
     );
   }
 
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
         reason: "invalid_format",
       },
       { status: 200 },
+      request,
     );
   }
 
@@ -65,6 +68,7 @@ export async function GET(request: Request) {
       available,
     },
     { status: 200 },
+    request,
   );
 }
 
@@ -77,6 +81,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "Invalid JSON body" },
       { status: 400 },
+      request,
     );
   }
 
@@ -86,6 +91,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "Missing `username`" },
       { status: 400 },
+      request,
     );
   }
 
@@ -93,6 +99,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "invalid_username_format" },
       { status: 400 },
+      request,
     );
   }
 
@@ -100,9 +107,11 @@ export async function PATCH(request: Request) {
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
+      { error: "Internal server error" },
       { status: 500 },
+      request,
     );
   }
 
@@ -110,6 +119,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "Authentication required" },
       { status: 401 },
+      request,
     );
   }
 
@@ -125,6 +135,7 @@ export async function PATCH(request: Request) {
     return withCors(
       { error: "username_taken" },
       { status: 409 },
+      request,
     );
   }
 
@@ -140,13 +151,10 @@ export async function PATCH(request: Request) {
       username: updated.username,
     },
     { status: 200 },
+    request,
   );
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-

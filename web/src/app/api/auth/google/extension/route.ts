@@ -5,24 +5,12 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/db";
 import { users, shares } from "@/db/schema";
+import { withCors, optionsResponse } from "@/lib/cors";
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
+const AUTH_RATE = { windowMs: 60_000, maxRequests: 10 };
 
 interface GoogleUserInfoResponse {
   sub?: string;
@@ -32,7 +20,22 @@ interface GoogleUserInfoResponse {
   picture?: string;
 }
 
+const TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 export async function POST(request: Request) {
+  const ip = getClientIP(request);
+  const rl = checkRateLimit(`auth-ext:${ip}`, AUTH_RATE);
+  if (!rl.allowed) {
+    return withCors(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.retryAfterMs ?? 1000) / 1000)) },
+      },
+      request,
+    );
+  }
+
   let body: { accessToken?: string } = {};
 
   try {
@@ -41,6 +44,7 @@ export async function POST(request: Request) {
     return withCors(
       { error: "Invalid JSON body" },
       { status: 400 },
+      request,
     );
   }
 
@@ -49,6 +53,7 @@ export async function POST(request: Request) {
     return withCors(
       { error: "Missing accessToken" },
       { status: 400 },
+      request,
     );
   }
 
@@ -65,6 +70,7 @@ export async function POST(request: Request) {
       return withCors(
         { error: "Invalid Google access token" },
         { status: 401 },
+        request,
       );
     }
 
@@ -73,6 +79,7 @@ export async function POST(request: Request) {
     return withCors(
       { error: "Failed to verify Google access token" },
       { status: 500 },
+      request,
     );
   }
 
@@ -85,6 +92,7 @@ export async function POST(request: Request) {
     return withCors(
       { error: "Google account did not return an email or id" },
       { status: 400 },
+      request,
     );
   }
 
@@ -116,6 +124,7 @@ export async function POST(request: Request) {
         name,
         image,
         apiToken,
+        tokenExpiresAt: nowMs + TOKEN_LIFETIME_MS,
         createdAt: nowMs,
       })
       .returning();
@@ -137,8 +146,15 @@ export async function POST(request: Request) {
         },
       },
       { status: 200 },
+      request,
     );
   }
+
+  const needsNewToken =
+    !user.tokenExpiresAt || user.tokenExpiresAt < nowMs + 7 * 24 * 60 * 60 * 1000;
+
+  const newToken = needsNewToken ? randomUUID() : user.apiToken;
+  const newExpiry = needsNewToken ? nowMs + TOKEN_LIFETIME_MS : user.tokenExpiresAt;
 
   const [updated] = await db
     .update(users)
@@ -146,6 +162,8 @@ export async function POST(request: Request) {
       googleId: user.googleId ?? googleId,
       name: name ?? user.name,
       image: image ?? user.image,
+      apiToken: newToken,
+      tokenExpiresAt: newExpiry,
     })
     .where(eq(users.id, user.id))
     .returning();
@@ -167,13 +185,10 @@ export async function POST(request: Request) {
       },
     },
     { status: 200 },
+    request,
   );
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-

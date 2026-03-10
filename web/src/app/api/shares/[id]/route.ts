@@ -4,22 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { shares } from "@/db/schema";
 import { resolveAuth } from "@/lib/auth";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "PATCH,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
+import { withCors, optionsResponse } from "@/lib/cors";
 
 function parseId(request: Request): number | null {
   const url = new URL(request.url);
@@ -36,23 +21,23 @@ function parseId(request: Request): number | null {
 export async function PATCH(request: Request) {
   const idNum = parseId(request);
   if (!idNum) {
-    return withCors({ error: "Invalid share id" }, { status: 400 });
+    return withCors({ error: "Invalid share id" }, { status: 400 }, request);
   }
 
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type !== "user") {
-    return withCors({ error: "Unauthorized" }, { status: 401 });
+    return withCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   const [existing] = await db
@@ -67,7 +52,7 @@ export async function PATCH(request: Request) {
     .limit(1);
 
   if (!existing) {
-    return withCors({ error: "Not found" }, { status: 404 });
+    return withCors({ error: "Not found" }, { status: 404 }, request);
   }
 
   const [updated] = await db
@@ -76,13 +61,9 @@ export async function PATCH(request: Request) {
     .where(eq(shares.id, idNum))
     .returning();
 
-  return withCors({ share: updated }, { status: 200 });
+  return withCors({ share: updated }, { status: 200 }, request);
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-

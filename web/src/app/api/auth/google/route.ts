@@ -10,8 +10,11 @@ import {
 
 import { db } from "@/db";
 import { users, shares } from "@/db/schema";
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
+
+const AUTH_RATE = { windowMs: 60_000, maxRequests: 10 };
 
 const GOOGLE_ISSUERS = new Set([
   "https://accounts.google.com",
@@ -30,9 +33,24 @@ interface GoogleIdTokenPayload extends JWTPayload {
   sub?: string;
 }
 
+const TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 export async function POST(request: Request) {
+  const ip = getClientIP(request);
+  const rl = checkRateLimit(`auth-google:${ip}`, AUTH_RATE);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.retryAfterMs ?? 1000) / 1000)) },
+      },
+    );
+  }
+
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
+    console.error("GOOGLE_CLIENT_ID is not configured");
     return NextResponse.json(
       { error: "Google login is not configured" },
       { status: 500 },
@@ -128,6 +146,7 @@ export async function POST(request: Request) {
         name,
         image,
         apiToken,
+        tokenExpiresAt: nowMs + TOKEN_LIFETIME_MS,
         createdAt: nowMs,
       })
       .returning();
@@ -151,13 +170,21 @@ export async function POST(request: Request) {
     });
   }
 
-  // Existing user: make sure we store googleId if missing, and refresh profile info.
+  // Existing user: refresh token if near expiry, and update profile info.
+  const needsNewToken =
+    !user.tokenExpiresAt || user.tokenExpiresAt < nowMs + 7 * 24 * 60 * 60 * 1000;
+
+  const newToken = needsNewToken ? randomUUID() : user.apiToken;
+  const newExpiry = needsNewToken ? nowMs + TOKEN_LIFETIME_MS : user.tokenExpiresAt;
+
   const [updated] = await db
     .update(users)
     .set({
       googleId: user.googleId ?? googleId,
       name: name ?? user.name,
       image: image ?? user.image,
+      apiToken: newToken,
+      tokenExpiresAt: newExpiry,
     })
     .where(eq(users.id, user.id))
     .returning();
@@ -180,4 +207,3 @@ export async function POST(request: Request) {
     },
   });
 }
-

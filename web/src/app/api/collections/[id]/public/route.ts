@@ -3,22 +3,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { collections, collectionLinks, links } from "@/db/schema";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
+import { withCors, optionsResponse } from "@/lib/cors";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -27,7 +12,7 @@ export async function GET(request: Request) {
   const idSegment = segments[segments.length - 2];
   const idNum = Number(idSegment);
   if (!Number.isInteger(idNum) || idNum <= 0) {
-    return withCors({ error: "Invalid collection id" }, { status: 400 });
+    return withCors({ error: "Invalid collection id" }, { status: 400 }, request);
   }
 
   const [collection] = await db
@@ -37,7 +22,7 @@ export async function GET(request: Request) {
     .limit(1);
 
   if (!collection) {
-    return withCors({ error: "Not found" }, { status: 404 });
+    return withCors({ error: "Not found" }, { status: 404 }, request);
   }
 
   const items = await db
@@ -56,13 +41,10 @@ export async function GET(request: Request) {
       items,
     },
     { status: 200 },
+    request,
   );
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-

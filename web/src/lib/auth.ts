@@ -31,16 +31,19 @@ export async function resolveAuth(request: Request): Promise<AuthResult> {
     return { type: "apiKey" };
   }
 
-  const user = await db
+  const [user] = await db
     .select()
     .from(users)
     .where(eq(users.apiToken, token))
     .limit(1);
 
-  if (!user.length) {
+  if (!user) {
     return { type: "unauthorized" };
   }
 
-  return { type: "user", user: user[0] };
-}
+  if (user.tokenExpiresAt && user.tokenExpiresAt < Date.now()) {
+    return { type: "unauthorized" };
+  }
 
+  return { type: "user", user };
+}

@@ -4,40 +4,25 @@ import { and, desc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { links, shares, collections, users } from "@/db/schema";
 import { resolveAuth } from "@/lib/auth";
+import { withCors, optionsResponse } from "@/lib/cors";
 
 export const runtime = "nodejs";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
 
 export async function GET(request: Request) {
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type !== "user") {
-    return withCors({ error: "Unauthorized" }, { status: 401 });
+    return withCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   const user = auth.user;
@@ -61,7 +46,7 @@ export async function GET(request: Request) {
     )
     .orderBy(desc(shares.createdAt));
 
-  return withCors({ items: sharedWithMe }, { status: 200 });
+  return withCors({ items: sharedWithMe }, { status: 200 }, request);
 }
 
 export async function POST(request: Request) {
@@ -69,16 +54,16 @@ export async function POST(request: Request) {
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type !== "user") {
-    return withCors({ error: "Unauthorized" }, { status: 401 });
+    return withCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   let body: {
@@ -91,13 +76,13 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) ?? {};
   } catch {
-    return withCors({ error: "Invalid JSON body" }, { status: 400 });
+    return withCors({ error: "Invalid JSON body" }, { status: 400 }, request);
   }
 
   const { toEmail, linkId, collectionId, message } = body;
 
   if (!toEmail || typeof toEmail !== "string") {
-    return withCors({ error: "Missing or invalid `toEmail`" }, { status: 400 });
+    return withCors({ error: "Missing or invalid `toEmail`" }, { status: 400 }, request);
   }
 
   const normalizedEmail = toEmail.toLowerCase().trim();
@@ -106,6 +91,7 @@ export async function POST(request: Request) {
     return withCors(
       { error: "Either `linkId` or `collectionId` is required" },
       { status: 400 },
+      request,
     );
   }
 
@@ -113,6 +99,7 @@ export async function POST(request: Request) {
     return withCors(
       { error: "Only one of `linkId` or `collectionId` may be set" },
       { status: 400 },
+      request,
     );
   }
 
@@ -125,7 +112,7 @@ export async function POST(request: Request) {
       .limit(1);
 
     if (!link) {
-      return withCors({ error: "Link not found" }, { status: 404 });
+      return withCors({ error: "Link not found" }, { status: 404 }, request);
     }
   }
 
@@ -139,7 +126,7 @@ export async function POST(request: Request) {
       .limit(1);
 
     if (!collection) {
-      return withCors({ error: "Collection not found" }, { status: 404 });
+      return withCors({ error: "Collection not found" }, { status: 404 }, request);
     }
   }
 
@@ -165,13 +152,9 @@ export async function POST(request: Request) {
     })
     .returning();
 
-  return withCors({ share: created }, { status: 201 });
+  return withCors({ share: created }, { status: 201 }, request);
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-

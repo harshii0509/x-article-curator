@@ -5,24 +5,10 @@ import { db } from "@/db";
 import { links } from "@/db/schema";
 import { unfurlUrl } from "@/lib/unfurl";
 import { resolveAuth } from "@/lib/auth";
+import { withCors, optionsResponse } from "@/lib/cors";
+import { validateHttpUrl } from "@/lib/url-validation";
 
 export const runtime = "nodejs";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -37,20 +23,19 @@ export async function GET(request: Request) {
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type === "unauthorized") {
     return withCors(
       { error: "Unauthorized" },
-      {
-        status: 401,
-      },
+      { status: 401 },
+      request,
     );
   }
 
@@ -63,6 +48,7 @@ export async function GET(request: Request) {
         limit,
       },
       { status: 200 },
+      request,
     );
   }
 
@@ -81,6 +67,7 @@ export async function GET(request: Request) {
       limit,
     },
     { status: 200 },
+    request,
   );
 }
 
@@ -92,9 +79,8 @@ export async function POST(request: Request) {
   } catch {
     return withCors(
       { error: "Invalid JSON body" },
-      {
-        status: 400,
-      },
+      { status: 400 },
+      request,
     );
   }
 
@@ -103,43 +89,55 @@ export async function POST(request: Request) {
   if (!url || typeof url !== "string") {
     return withCors(
       { error: "Missing or invalid `url`" },
-      {
-        status: 400,
-      },
+      { status: 400 },
+      request,
     );
   }
-  try {
-    const parsed = new URL(url);
-    if (!["http:", "https:"].includes(parsed.protocol)) {
+
+  const urlCheck = validateHttpUrl(url);
+  if (!urlCheck.valid) {
+    return withCors(
+      { error: urlCheck.reason },
+      { status: 400 },
+      request,
+    );
+  }
+
+  if (tweetUrl != null) {
+    if (typeof tweetUrl !== "string") {
       return withCors(
-        { error: "Only HTTP(S) URLs are allowed" },
+        { error: "Invalid `tweetUrl`" },
         { status: 400 },
+        request,
       );
     }
-  } catch {
-    return withCors(
-      { error: "Invalid URL format" },
-      { status: 400 },
-    );
+    const tweetCheck = validateHttpUrl(tweetUrl);
+    if (!tweetCheck.valid) {
+      return withCors(
+        { error: "Only HTTP(S) tweet URLs are allowed" },
+        { status: 400 },
+        request,
+      );
+    }
   }
+
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type === "unauthorized") {
     return withCors(
       { error: "Unauthorized" },
-      {
-        status: 401,
-      },
+      { status: 401 },
+      request,
     );
   }
 
@@ -147,6 +145,7 @@ export async function POST(request: Request) {
     return withCors(
       { error: "User authentication required to save articles" },
       { status: 403 },
+      request,
     );
   }
 
@@ -166,9 +165,8 @@ export async function POST(request: Request) {
         status: "duplicate" as const,
         link: existing[0],
       },
-      {
-        status: 200,
-      },
+      { status: 200 },
+      request,
     );
   }
 
@@ -176,7 +174,6 @@ export async function POST(request: Request) {
   try {
     metadata = await unfurlUrl(url);
   } catch (error) {
-    // Log but do not fail the request; we still save the bare URL.
     console.error(`Failed to unfurl ${url}:`, error);
   }
 
@@ -196,16 +193,11 @@ export async function POST(request: Request) {
         status: "created" as const,
         link: inserted,
     },
-    {
-      status: 201,
-    },
+    { status: 201 },
+    request,
   );
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-

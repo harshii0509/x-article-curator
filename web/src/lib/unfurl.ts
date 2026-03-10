@@ -1,5 +1,7 @@
 import { unfurl } from "unfurl.js";
 
+import { assertPublicHostname, validateHttpUrl } from "@/lib/url-validation";
+
 export interface ArticleMetadata {
   title?: string;
   author?: string;
@@ -9,7 +11,27 @@ export interface ArticleMetadata {
   favicon?: string;
 }
 
+function sanitizeUrl(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || !raw) return undefined;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return raw;
+    }
+  } catch {
+    // invalid URL
+  }
+  return undefined;
+}
+
 export async function unfurlUrl(url: string): Promise<ArticleMetadata> {
+  const check = validateHttpUrl(url);
+  if (!check.valid) {
+    throw new Error(check.reason);
+  }
+
+  await assertPublicHostname(check.parsed.hostname);
+
   const data = (await unfurl(url, {
     oembed: false,
     timeout: 5000,
@@ -30,7 +52,7 @@ export async function unfurlUrl(url: string): Promise<ArticleMetadata> {
     data?.description ??
     data?.metadata?.description;
 
-  const imageUrl =
+  const rawImageUrl =
     openGraph.images?.[0]?.url ??
     openGraph.image?.url ??
     twitterCard.images?.[0]?.url ??
@@ -49,7 +71,7 @@ export async function unfurlUrl(url: string): Promise<ArticleMetadata> {
     twitterCard.creator_id ??
     data?.metadata?.author;
 
-  const favicon =
+  const rawFavicon =
     data?.favicon ??
     data?.icons?.[0]?.url ??
     data?.metadata?.favicon ??
@@ -59,9 +81,8 @@ export async function unfurlUrl(url: string): Promise<ArticleMetadata> {
     title,
     author,
     description,
-    imageUrl,
+    imageUrl: sanitizeUrl(rawImageUrl),
     siteName,
-    favicon,
+    favicon: sanitizeUrl(rawFavicon),
   };
 }
-

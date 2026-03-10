@@ -4,22 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { collectionLinks, collections, links } from "@/db/schema";
 import { resolveAuth } from "@/lib/auth";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST,DELETE,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-};
-
-function withCors<T>(body: T, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      ...corsHeaders,
-    },
-  });
-}
+import { withCors, optionsResponse } from "@/lib/cors";
 
 function parseId(request: Request): number | null {
   const url = new URL(request.url);
@@ -36,23 +21,23 @@ function parseId(request: Request): number | null {
 export async function POST(request: Request) {
   const collectionId = parseId(request);
   if (!collectionId) {
-    return withCors({ error: "Invalid collection id" }, { status: 400 });
+    return withCors({ error: "Invalid collection id" }, { status: 400 }, request);
   }
 
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type !== "user") {
-    return withCors({ error: "Unauthorized" }, { status: 401 });
+    return withCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   const [collection] = await db
@@ -67,19 +52,19 @@ export async function POST(request: Request) {
     .limit(1);
 
   if (!collection) {
-    return withCors({ error: "Not found" }, { status: 404 });
+    return withCors({ error: "Not found" }, { status: 404 }, request);
   }
 
   let body: { linkId?: number } = {};
   try {
     body = (await request.json()) ?? {};
   } catch {
-    return withCors({ error: "Invalid JSON body" }, { status: 400 });
+    return withCors({ error: "Invalid JSON body" }, { status: 400 }, request);
   }
 
   const linkId = body.linkId;
   if (!linkId || !Number.isInteger(linkId)) {
-    return withCors({ error: "Missing or invalid `linkId`" }, { status: 400 });
+    return withCors({ error: "Missing or invalid `linkId`" }, { status: 400 }, request);
   }
 
   const [link] = await db
@@ -89,7 +74,7 @@ export async function POST(request: Request) {
     .limit(1);
 
   if (!link || link.userId !== auth.user.id) {
-    return withCors({ error: "Link not found" }, { status: 404 });
+    return withCors({ error: "Link not found" }, { status: 404 }, request);
   }
 
   const existing = await db
@@ -104,7 +89,7 @@ export async function POST(request: Request) {
     .limit(1);
 
   if (existing.length) {
-    return withCors({ ok: true }, { status: 200 });
+    return withCors({ ok: true }, { status: 200 }, request);
   }
 
   const now = Date.now();
@@ -115,36 +100,36 @@ export async function POST(request: Request) {
     addedAt: now,
   });
 
-  return withCors({ ok: true }, { status: 201 });
+  return withCors({ ok: true }, { status: 201 }, request);
 }
 
 export async function DELETE(request: Request) {
   const collectionId = parseId(request);
   if (!collectionId) {
-    return withCors({ error: "Invalid collection id" }, { status: 400 });
+    return withCors({ error: "Invalid collection id" }, { status: 400 }, request);
   }
 
   const url = new URL(request.url);
   const linkIdParam = url.searchParams.get("linkId");
   const linkId = linkIdParam ? Number(linkIdParam) : NaN;
   if (!Number.isInteger(linkId) || linkId <= 0) {
-    return withCors({ error: "Invalid linkId" }, { status: 400 });
+    return withCors({ error: "Invalid linkId" }, { status: 400 }, request);
   }
 
   let auth;
   try {
     auth = await resolveAuth(request);
   } catch (error) {
+    console.error("Auth resolution failed:", error);
     return withCors(
-      { error: (error as Error).message },
-      {
-        status: 500,
-      },
+      { error: "Internal server error" },
+      { status: 500 },
+      request,
     );
   }
 
   if (auth.type !== "user") {
-    return withCors({ error: "Unauthorized" }, { status: 401 });
+    return withCors({ error: "Unauthorized" }, { status: 401 }, request);
   }
 
   const [collection] = await db
@@ -159,7 +144,7 @@ export async function DELETE(request: Request) {
     .limit(1);
 
   if (!collection) {
-    return withCors({ error: "Not found" }, { status: 404 });
+    return withCors({ error: "Not found" }, { status: 404 }, request);
   }
 
   await db
@@ -171,13 +156,9 @@ export async function DELETE(request: Request) {
       ),
     );
 
-  return withCors({ ok: true }, { status: 200 });
+  return withCors({ ok: true }, { status: 200 }, request);
 }
 
-export function OPTIONS() {
-  return new NextResponse(null, {
-    status: 204,
-    headers: corsHeaders,
-  });
+export function OPTIONS(request: Request) {
+  return optionsResponse(request);
 }
-
