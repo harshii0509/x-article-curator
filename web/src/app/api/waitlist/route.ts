@@ -6,6 +6,7 @@ import { checkRateLimit, getClientIP } from "@/lib/rate-limit";
 import { sendWaitlistConfirmation } from "@/lib/email";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const WAITLIST_RATE = { windowMs: 10 * 60_000, maxRequests: 5 };
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -18,7 +19,9 @@ export async function POST(request: Request) {
       { error: "Too many requests" },
       {
         status: 429,
-        headers: { "Retry-After": String(Math.ceil((rl.retryAfterMs ?? 1000) / 1000)) },
+        headers: {
+          "Retry-After": String(Math.ceil((rl.retryAfterMs ?? 1000) / 1000)),
+        },
       },
     );
   }
@@ -37,7 +40,9 @@ export async function POST(request: Request) {
 
   let isNew = false;
   try {
-    await db.insert(waitlist).values({ email, ipAddress: ip, joinedAt: Date.now() });
+    await db
+      .insert(waitlist)
+      .values({ email, ipAddress: ip, joinedAt: Date.now() });
     isNew = true;
   } catch {
     // Unique constraint violation = email already registered. Return ok silently
