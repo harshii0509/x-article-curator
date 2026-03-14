@@ -75,7 +75,7 @@ export function WaitlistForm() {
     <div className="flex flex-col gap-2">
       <form onSubmit={handleSubmit} className="flex flex-col gap-2" noValidate>
         <div className="flex flex-col md:flex-row md:items-start gap-2">
-          <div className="flex flex-col gap-0.5 flex-1">
+          <div className="flex flex-col gap-0.5">
             <input
               type="email"
               placeholder="Enter email"
