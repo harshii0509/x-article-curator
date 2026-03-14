@@ -13,10 +13,10 @@ export const metadata: Metadata = {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen flex flex-col bg-ns-bg text-ns-ink">
+    <div className="h-screen min-h-screen flex flex-col bg-ns-bg text-ns-ink">
       <LandingJsonLd />
       {/* Same container as Figma: 80px top/left/right, 24px bottom, max 700px, footer at bottom */}
-      <div className="flex flex-1 flex-col justify-between pt-20 px-6 pb-6 max-w-[700px] md:px-20">
+      <div className="flex flex-1 flex-col justify-between pt-20 px-6 pb-6 max-w-[700px] md:px-20 w-full">
         {/* Logo + content block */}
         <div className="flex flex-col gap-8">
           {/* Logo — 80px from top/left via container padding */}
