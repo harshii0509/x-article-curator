@@ -74,8 +74,8 @@ export function WaitlistForm() {
   return (
     <div className="flex flex-col gap-2">
       <form onSubmit={handleSubmit} className="flex flex-col gap-2" noValidate>
-        <div className="flex items-start gap-2">
-          <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col md:flex-row md:items-start gap-2">
+          <div className="flex flex-col gap-0.5 flex-1">
             <input
               type="email"
               placeholder="Enter email"
@@ -88,7 +88,7 @@ export function WaitlistForm() {
               aria-invalid={!!displayError}
               aria-describedby={displayError ? "waitlist-error" : undefined}
               className="
-                w-[254px] bg-ns-surface rounded-lg px-3 py-2
+                w-full md:w-[254px] bg-ns-surface rounded-lg px-3 py-2
                 font-inter font-book text-[13px] text-ns-ink tracking-[-0.1px] leading-[1.2]
                 placeholder:text-ns-ink/40
                 focus:outline-none focus:ring-1 focus:ring-ns-accent/40
@@ -100,7 +100,7 @@ export function WaitlistForm() {
               <p
                 id="waitlist-error"
                 role="alert"
-                className="w-[254px] max-w-[254px] font-inter font-book text-[13px] text-ns-error-deep tracking-[-0.1px] leading-[1.3]"
+                className="w-full md:w-[254px] md:max-w-[254px] font-inter font-book text-[13px] text-ns-error-deep tracking-[-0.1px] leading-[1.3]"
               >
                 {displayError}
               </p>
@@ -110,7 +110,7 @@ export function WaitlistForm() {
             type="submit"
             disabled={state === "loading"}
             className="
-              bg-ns-accent text-ns-accent-fg rounded-lg px-3 py-2
+              w-full md:w-auto bg-ns-accent text-ns-accent-fg rounded-lg px-3 py-2
               font-inter font-medium text-[13px] tracking-[-0.1px] leading-[1.2] whitespace-nowrap
               hover:opacity-90 active:opacity-80
               disabled:opacity-50 disabled:cursor-not-allowed

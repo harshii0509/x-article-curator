@@ -16,7 +16,7 @@ export default function LandingPage() {
     <div className="min-h-screen flex flex-col bg-ns-bg text-ns-ink">
       <LandingJsonLd />
       {/* Same container as Figma: 80px top/left/right, 24px bottom, max 700px, footer at bottom */}
-      <div className="flex flex-1 flex-col justify-between pt-20 px-20 pb-6 max-w-[700px]">
+      <div className="flex flex-1 flex-col justify-between pt-20 px-6 pb-6 max-w-[700px] md:px-20">
         {/* Logo + content block */}
         <div className="flex flex-col gap-8">
           {/* Logo — 80px from top/left via container padding */}
