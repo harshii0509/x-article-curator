@@ -2,10 +2,19 @@ import Image from "next/image";
 import { WaitlistForm } from "./waitlist-form";
 import brandLogo from "@/assets/brandLogo.svg";
 import Link from "next/link";
+import type { Metadata } from "next";
+import { LandingJsonLd } from "@/components/json-ld";
+
+export const metadata: Metadata = {
+  title: "Nightstand - Save Articles for Weekend Reading",
+  description:
+    "Every week you find articles worth reading. By Saturday they're buried and forgotten. Nightstand saves them and groups them by week so when you finally have an hour, your list is already waiting.",
+};
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen flex flex-col bg-ns-bg text-ns-ink">
+      <LandingJsonLd />
       {/* Same container as Figma: 80px top/left/right, 24px bottom, max 700px, footer at bottom */}
       <div className="flex flex-1 flex-col justify-between pt-20 px-20 pb-6 max-w-[700px]">
         {/* Logo + content block */}

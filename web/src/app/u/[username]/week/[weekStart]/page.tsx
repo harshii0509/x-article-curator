@@ -5,6 +5,7 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { links, publicWeeks, users } from "@/db/schema";
 import { LinkCard } from "@/components/link-card";
+import { PublicWeekJsonLd, SITE_URL } from "@/components/json-ld";
 import { formatWeekLabel } from "@/lib/week-utils";
 
 type Params = {
@@ -113,9 +114,18 @@ export default async function PublicWeekPage(
   const weekLabel = formatWeekLabel(data!.weekStartMs);
   const count = data!.links.length;
   const name = data!.user.name ?? data!.user.username ?? "Someone";
+  const pageUrl = `${SITE_URL}/u/${resolved.username}/week/${resolved.weekStart}`;
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-12">
+      <PublicWeekJsonLd
+        name={name}
+        username={resolved.username}
+        weekLabel={weekLabel}
+        linkCount={count}
+        pageUrl={pageUrl}
+        links={data!.links.map((l) => ({ url: l.url, title: l.title }))}
+      />
       <header className="space-y-2">
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
           Weekly reading
