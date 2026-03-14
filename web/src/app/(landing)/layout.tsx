@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export default function LandingLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#111110] text-[#EDEDED]">
+    <div className="min-h-screen bg-ns-bg text-ns-ink">
       {children}
     </div>
   );

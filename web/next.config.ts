@@ -35,6 +35,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Bundle: direct imports for icon libraries (Vercel React Best Practices 2.1)
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   async headers() {
     return [
       {

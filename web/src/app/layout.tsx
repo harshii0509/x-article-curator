@@ -21,7 +21,7 @@ const newsreader = Newsreader({
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400"],
+  // No weight specified → loads as variable font (supports 100–900 incl. 450)
 });
 
 export const metadata: Metadata = {

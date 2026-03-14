@@ -1,55 +1,77 @@
+import Image from "next/image";
+import { WaitlistForm } from "./waitlist-form";
+import brandLogo from "@/assets/brandLogo.svg";
 import Link from "next/link";
-import { LampLogo } from "@/components/lamp-logo";
 
 export default function LandingPage() {
   return (
-    <div className="mx-auto flex min-h-screen max-w-4xl flex-col px-6 py-12">
-      <main className="mx-auto flex max-w-xl flex-1 flex-col justify-center">
-        <div className="mb-5 flex items-center gap-3">
-          <LampLogo />
+    <div className="min-h-screen flex flex-col bg-ns-bg text-ns-ink">
+      {/* Same container as Figma: 80px top/left/right, 24px bottom, max 700px, footer at bottom */}
+      <div className="flex flex-1 flex-col justify-between pt-20 px-20 pb-6 max-w-[700px]">
+        {/* Logo + content block */}
+        <div className="flex flex-col gap-8">
+          {/* Logo — 80px from top/left via container padding */}
+          <div className="h-[71px] w-[72px] shrink-0">
+            <Image
+              src={brandLogo}
+              alt="Nightstand logo"
+              width={72}
+              height={71}
+              priority
+              className="h-full w-full object-contain object-top-left"
+            />
+          </div>
+
+          {/* Text sections + form: 32px between blocks, 40px between Nightstand and About */}
+          <div className="flex flex-col gap-8">
+            {/* Nightstand */}
+            <div className="flex flex-col gap-2">
+              <p className="font-newsreader font-medium text-[14px] text-ns-ink tracking-[0.28px] leading-[1.2]">
+                Nightstand
+              </p>
+              <p className="font-inter font-book text-[13px] text-ns-ink tracking-[-0.1px] leading-normal">
+                It&apos;s your reading pile, but it actually works. A reading
+                list that gives you weekly recap of things to read for that
+                week.
+              </p>
+            </div>
+
+            {/* About */}
+            <div className="flex flex-col gap-2">
+              <p className="font-newsreader font-medium text-[14px] text-ns-ink tracking-[0.28px] leading-[1.2]">
+                About
+              </p>
+              <p className="font-inter font-book text-[13px] text-ns-ink tracking-[-0.1px] leading-normal">
+                Every week you find articles worth reading. By Saturday
+                they&apos;re buried and forgotten. Nightstand saves them and
+                groups them by week so when you finally have an hour, your list
+                is already waiting.
+              </p>
+            </div>
+
+            {/* Waitlist */}
+            <WaitlistForm />
+          </div>
         </div>
 
-        <h1
-          className="text-[15px] text-[#EDEDED]"
-          style={{ fontFamily: "var(--font-newsreader)", lineHeight: "120%" }}
-        >
-          (Nightstand) — Your reading pile, but it actually works
-        </h1>
-
-        <section
-          className="mt-3 space-y-4 text-[13px] text-[#A6A09B]"
-          style={{ fontFamily: "var(--font-inter)", lineHeight: "150%" }}
-        >
-          <p>
-            Every week you find articles worth reading. Blog posts linked in
-            threads. Essays on Substack. Deep dives someone shared on Twitter.
-            You bookmark them. You forget them. By the weekend, they&apos;re
-            gone buried in a graveyard of good intentions.
+        {/* Footer — same container, pinned to bottom via justify-between */}
+        <footer className="mt-auto flex items-center justify-between pt-6">
+          <p className="font-inter font-book text-[13px] text-ns-ink/40 tracking-[-0.1px] leading-[1.2]">
+            brought to you by {" "} 
+            <Link
+              href="https://x.com/harshii04"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:underline"
+            >
+              Harshvardhan Agarwal
+            </Link>
           </p>
-          <p>
-            Nightstand is where you put things you intend to come back to. One
-            click from the browser extension. Title, author, and preview pulled
-            automatically. Organized by the week you saved it. When the weekend
-            comes round, your reading list is sitting right where you left it.
+          <p className="font-inter font-book text-[13px] text-ns-ink/40 tracking-[-0.1px] leading-[1.2]">
+            ©2026
           </p>
-          <p>
-            No feeds to scroll. No algorithm deciding what&apos;s worth your
-            time. No onboarding. No tracking. No ads. Just the articles you
-            picked, grouped by week, on your nightstand.
-          </p>
-        </section>
-
-        <div className="mt-6">
-          <Link
-            href="/login"
-            className="inline-flex items-center rounded-sm bg-[#2A2A28] px-2 py-2 text-[13px] font-medium text-[#EDEDED] hover:bg-[#343431]"
-            style={{ fontFamily: "var(--font-inter)", lineHeight: "120%" }}
-          >
-            Get started
-          </Link>
-        </div>
-      </main>
+        </footer>
+      </div>
     </div>
   );
 }
-

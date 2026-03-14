@@ -109,3 +109,10 @@ export const publicWeeks = sqliteTable(
   }),
 );
 
+export const waitlist = sqliteTable("waitlist", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  email: text("email").notNull().unique(),
+  ipAddress: text("ip_address"),
+  joinedAt: integer("joined_at", { mode: "number" }).notNull(),
+});
+

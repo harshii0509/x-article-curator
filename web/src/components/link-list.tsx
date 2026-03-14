@@ -2,11 +2,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import useSWR from "swr";
 
 import { groupByWeek } from "@/lib/week-utils";
 import { LinkCard } from "./link-card";
 import { WeekGroup } from "./week-group";
 import { UsernameDialog } from "./username-dialog";
+
+const TOKEN_KEY = "nightstand-api-token";
+const USERNAME_KEY = "nightstand-api-token:username";
+const REFRESH_INTERVAL_MS = 10_000;
 
 type Link = {
   id: number;
@@ -25,108 +30,72 @@ type ApiResponse =
   | { error: string }
   | { links: Link[]; page: number; limit: number };
 
+type WeeksResponse = {
+  weeks?: { weekStart: number; isPublic: number }[];
+  error?: string;
+};
+
+function useStoredToken(): string | null | undefined {
+  const [token, setToken] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    setToken(
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(TOKEN_KEY)
+        : null,
+    );
+  }, []);
+  return token;
+}
+
+function fetcherWithAuth(url: string, token: string) {
+  return fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).then((res) => res.json());
+}
+
 export function LinkList() {
-  const [state, setState] = useState<{
-    status: "loading" | "no-token" | "empty" | "ok" | "error";
-    links: Link[];
-    error?: string;
-  }>({ status: "loading", links: [] });
+  const token = useStoredToken();
+  const [username, setUsername] = useState<string | null>(null);
+  const [showUsernameDialog, setShowUsernameDialog] = useState(false);
   const [publicWeeks, setPublicWeeks] = useState<Map<number, boolean>>(
     () => new Map(),
   );
-  const [username, setUsername] = useState<string | null>(null);
-  const [showUsernameDialog, setShowUsernameDialog] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      const token =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem("nightstand-api-token")
-          : null;
-
-      if (!token) {
-        if (!cancelled) {
-          setState({ status: "no-token", links: [] });
-        }
-        return;
-      }
-
-      if (typeof window !== "undefined") {
-        const storedUsername =
-          window.localStorage.getItem("nightstand-api-token:username");
-        if (storedUsername) {
-          setUsername(storedUsername || null);
-        }
-      }
-
-      try {
-        const [linksRes, weeksRes] = await Promise.all([
-          fetch("/api/links", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-          fetch("/api/weeks", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }),
-        ]);
-
-        const linksData: ApiResponse = await linksRes.json();
-        const weeksData: { weeks?: { weekStart: number; isPublic: number }[]; error?: string } =
-          await weeksRes.json();
-
-        if (!linksRes.ok || "error" in linksData) {
-          if (!cancelled) {
-            setState({
-              status: "error",
-              links: [],
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              error: (linksData as any).error ?? "Failed to load links",
-            });
-          }
-          return;
-        }
-
-        if (!linksData.links.length) {
-          if (!cancelled) {
-            setState({ status: "empty", links: [] });
-          }
-        } else if (!cancelled) {
-          setState({ status: "ok", links: linksData.links });
-        }
-
-        if (weeksRes.ok && weeksData.weeks && !cancelled) {
-          const map = new Map<number, boolean>();
-          for (const row of weeksData.weeks) {
-            map.set(row.weekStart, row.isPublic === 1);
-          }
-          setPublicWeeks(map);
-        }
-      } catch {
-        if (!cancelled) {
-          setState({
-            status: "error",
-            links: [],
-            error: "Failed to load links",
-          });
-        }
-      }
+    if (token && typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(USERNAME_KEY);
+      if (stored) setUsername(stored || null);
     }
+  }, [token]);
 
-    load();
-    const intervalId = window.setInterval(load, 10000);
+  const {
+    data: linksData,
+    error: linksError,
+    isLoading: linksLoading,
+  } = useSWR<ApiResponse>(
+    token ? ["/api/links", token] : null,
+    ([url, t]) => fetcherWithAuth(url, t as string),
+    { refreshInterval: REFRESH_INTERVAL_MS },
+  );
 
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, []);
+  const { data: weeksData } = useSWR<WeeksResponse>(
+    token ? ["/api/weeks", token] : null,
+    ([url, t]) => fetcherWithAuth(url, t as string),
+    { refreshInterval: REFRESH_INTERVAL_MS },
+  );
 
-  if (state.status === "loading") {
+  useEffect(() => {
+    if (!weeksData?.weeks) return;
+    setPublicWeeks((prev) => {
+      const next = new Map(prev);
+      for (const row of weeksData.weeks!) {
+        next.set(row.weekStart, row.isPublic === 1);
+      }
+      return next;
+    });
+  }, [weeksData]);
+
+  if (token === undefined) {
     return (
       <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
         Loading your saved articles…
@@ -134,11 +103,32 @@ export function LinkList() {
     );
   }
 
-  if (state.status === "no-token") {
+  if (token === null) {
     return null;
   }
 
-  if (state.status === "empty") {
+  if (linksLoading && !linksData) {
+    return (
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+        Loading your saved articles…
+      </div>
+    );
+  }
+
+  if (linksError || !linksData || "error" in linksData) {
+    const message =
+      linksData && "error" in linksData
+        ? (linksData as ApiResponse & { error: string }).error
+        : "Failed to load links";
+    return (
+      <div className="rounded-xl border border-red-500/40 bg-red-50 px-4 py-8 text-center text-sm text-red-700 dark:border-red-500/60 dark:bg-red-950/40 dark:text-red-200">
+        {message}
+      </div>
+    );
+  }
+
+  const links = linksData.links;
+  if (!links.length) {
     return (
       <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400">
         No articles saved yet.
@@ -148,15 +138,7 @@ export function LinkList() {
     );
   }
 
-  if (state.status === "error") {
-    return (
-      <div className="rounded-xl border border-red-500/40 bg-red-50 px-4 py-8 text-center text-sm text-red-700 dark:border-red-500/60 dark:bg-red-950/40 dark:text-red-200">
-        {state.error ?? "Something went wrong loading your articles."}
-      </div>
-    );
-  }
-
-  const weeks = groupByWeek(state.links);
+  const weeks = groupByWeek(links);
 
   return (
     <>
@@ -181,8 +163,7 @@ export function LinkList() {
               onUsernameRequired={() => setShowUsernameDialog(true)}
             >
               {week.items.map((link) => (
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                <LinkCard key={link.id} link={link as any} />
+                <LinkCard key={link.id} link={link as Parameters<typeof LinkCard>[0]["link"]} />
               ))}
             </WeekGroup>
           );
@@ -199,4 +180,3 @@ export function LinkList() {
     </>
   );
 }
-
