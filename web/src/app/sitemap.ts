@@ -6,6 +6,9 @@ import { collections, publicWeeks, users } from "@/db/schema";
 
 const baseUrl = "https://yournightstand.com";
 
+// Generate at request time so build doesn't require DB (e.g. Railway build has no DB)
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     {
@@ -16,37 +19,42 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const publicWeekRows = await db
-    .select({
-      username: users.username,
-      weekStart: publicWeeks.weekStart,
-    })
-    .from(publicWeeks)
-    .innerJoin(users, eq(publicWeeks.userId, users.id))
-    .where(eq(publicWeeks.isPublic, 1));
+  try {
+    const publicWeekRows = await db
+      .select({
+        username: users.username,
+        weekStart: publicWeeks.weekStart,
+      })
+      .from(publicWeeks)
+      .innerJoin(users, eq(publicWeeks.userId, users.id))
+      .where(eq(publicWeeks.isPublic, 1));
 
-  const weekRoutes: MetadataRoute.Sitemap = publicWeekRows
-    .filter((row) => row.username != null)
-    .map((row) => ({
-      url: `${baseUrl}/u/${row.username}/week/${row.weekStart}`,
-      lastModified: new Date(),
-      changeFrequency: "weekly" as const,
-      priority: 0.7,
-    }));
+    const weekRoutes: MetadataRoute.Sitemap = publicWeekRows
+      .filter((row) => row.username != null)
+      .map((row) => ({
+        url: `${baseUrl}/u/${row.username}/week/${row.weekStart}`,
+        lastModified: new Date(),
+        changeFrequency: "weekly" as const,
+        priority: 0.7,
+      }));
 
-  const publicCollectionRows = await db
-    .select({ slug: collections.slug })
-    .from(collections)
-    .where(eq(collections.isPublic, 1));
+    const publicCollectionRows = await db
+      .select({ slug: collections.slug })
+      .from(collections)
+      .where(eq(collections.isPublic, 1));
 
-  const collectionRoutes: MetadataRoute.Sitemap = publicCollectionRows.map(
-    (row) => ({
-      url: `${baseUrl}/c/${row.slug}`,
-      lastModified: new Date(),
-      changeFrequency: "weekly" as const,
-      priority: 0.7,
-    }),
-  );
+    const collectionRoutes: MetadataRoute.Sitemap = publicCollectionRows.map(
+      (row) => ({
+        url: `${baseUrl}/c/${row.slug}`,
+        lastModified: new Date(),
+        changeFrequency: "weekly" as const,
+        priority: 0.7,
+      }),
+    );
 
-  return [...staticRoutes, ...weekRoutes, ...collectionRoutes];
+    return [...staticRoutes, ...weekRoutes, ...collectionRoutes];
+  } catch {
+    // DB unavailable at build or missing tables — return static routes only
+    return staticRoutes;
+  }
 }
