@@ -10,32 +10,6 @@ const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 const USERNAME_KEY = `${TOKEN_KEY}:username`;
 const SCRIPT_ID = "google-identity-services";
 
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: {
-            client_id: string;
-            callback: (response: { credential?: string }) => void;
-          }) => void;
-          renderButton: (
-            parent: HTMLElement,
-            options: {
-              type?: string;
-              theme?: string;
-              size?: string;
-              shape?: string;
-              width?: number;
-              text?: string;
-            }
-          ) => void;
-        };
-      };
-    };
-  }
-}
-
 function GoogleIcon() {
   return (
     <svg
