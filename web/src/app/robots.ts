@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: ["/", "/c/", "/u/"],
-      disallow: ["/api/", "/dashboard/", "/login", "/collections/", "/shared/"],
+      disallow: ["/api/", "/dashboard/", "/collections/", "/shared/"],
     },
     sitemap: "https://yournightstand.com/sitemap.xml",
   };

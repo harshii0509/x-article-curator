@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { safeGet, safeSet } from "@/lib/storage";
 
 const TOKEN_KEY = "nightstand-api-token";
 const USERNAME_KEY = `${TOKEN_KEY}:username`;
@@ -32,10 +33,7 @@ export function UsernameDialog({ open, onClose, onSaved }: UsernameDialogProps) 
     if (!open) return;
     setError(null);
     setSaving(false);
-    const existing =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(USERNAME_KEY)
-        : null;
+    const existing = safeGet(USERNAME_KEY);
     if (existing && !username) {
       setUsername(existing);
       setAvailability({ status: "idle" });
@@ -99,10 +97,7 @@ export function UsernameDialog({ open, onClose, onSaved }: UsernameDialogProps) 
     setError(null);
 
     try {
-      const token =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem(TOKEN_KEY)
-          : null;
+      const token = safeGet(TOKEN_KEY);
 
       if (!token) {
         setError("You need to sign in to set a username.");
@@ -126,9 +121,7 @@ export function UsernameDialog({ open, onClose, onSaved }: UsernameDialogProps) 
         return;
       }
 
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(USERNAME_KEY, data.username ?? "");
-      }
+      safeSet(USERNAME_KEY, data.username ?? "");
 
       onSaved(data.username);
       setSaving(false);
@@ -150,39 +143,39 @@ export function UsernameDialog({ open, onClose, onSaved }: UsernameDialogProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-zinc-950 px-5 py-4 text-xs text-zinc-200 shadow-lg shadow-black/60">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+      <div className="w-full max-w-sm rounded-xl border border-ns-ink/10 bg-ns-bg px-5 py-4 text-xs text-ns-ink shadow-lg shadow-black/20">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ns-ink/50">
               Choose a public username
             </p>
-            <p className="mt-1 text-sm text-zinc-100">
+            <p className="mt-1 text-sm text-ns-ink">
               This is how your weekly reading page will be shared.
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-zinc-700 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-400 hover:bg-zinc-900"
+            className="rounded-full border border-ns-ink/20 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-ns-ink/50 hover:bg-ns-surface"
           >
             Close
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-1">
-            <label className="block text-[11px] text-zinc-400">
+            <label className="block text-[11px] text-ns-ink/50">
               Username
             </label>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-zinc-500">nightstand.so/u/</span>
+              <span className="text-[11px] text-ns-ink/50">nightstand.com/u/</span>
               <input
                 type="text"
                 value={username}
                 onChange={(e) =>
                   setUsername(e.target.value.toLowerCase().trimStart())
                 }
-                className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs text-zinc-100 outline-none ring-0 placeholder:text-zinc-500 focus:border-zinc-400"
+                className="w-full rounded-md border border-ns-ink/20 bg-ns-surface px-2 py-1.5 text-xs text-ns-ink outline-none ring-0 placeholder:text-ns-ink/50 focus:border-ns-ink/40"
                 placeholder="your-name"
                 autoFocus
               />
@@ -191,8 +184,8 @@ export function UsernameDialog({ open, onClose, onSaved }: UsernameDialogProps) 
               <p
                 className={`mt-1 text-[11px] ${
                   availability.status === "available"
-                    ? "text-emerald-400"
-                    : "text-red-400"
+                    ? "text-ns-success-deep"
+                    : "text-ns-error"
                 }`}
               >
                 {helperText}
@@ -200,7 +193,7 @@ export function UsernameDialog({ open, onClose, onSaved }: UsernameDialogProps) 
             )}
           </div>
           {error && (
-            <p className="text-[11px] text-red-400">
+            <p className="text-[11px] text-ns-error">
               {error}
             </p>
           )}
@@ -208,10 +201,10 @@ export function UsernameDialog({ open, onClose, onSaved }: UsernameDialogProps) 
             <button
               type="submit"
               disabled={!canSave}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium text-zinc-900 ${
+              className={`rounded-full px-3 py-1 text-[11px] font-medium ${
                 !canSave
-                  ? "bg-zinc-600/60 text-zinc-300"
-                  : "bg-[#F4C96B] hover:bg-[#f7d381]"
+                  ? "bg-ns-ink/20 text-ns-ink/50"
+                  : "bg-ns-accent text-ns-accent-fg hover:opacity-90"
               }`}
             >
               {saving

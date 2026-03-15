@@ -46,7 +46,10 @@ export function validateHttpUrl(url: string): { valid: true; parsed: URL } | { v
   }
 
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    return { valid: false, reason: "Only HTTP(S) URLs are allowed" };
+    return {
+      valid: false,
+      reason: `Only HTTP(S) URLs are allowed (got ${parsed.protocol}). Use a normal web page link.`,
+    };
   }
 
   return { valid: true, parsed };

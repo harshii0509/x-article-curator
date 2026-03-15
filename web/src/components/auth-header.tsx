@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { safeGet, safeRemove } from "@/lib/storage";
 
 type AuthState =
   | { status: "idle" }
@@ -9,25 +11,23 @@ type AuthState =
 const TOKEN_KEY = "nightstand-api-token";
 
 export function AuthHeader() {
+  const router = useRouter();
   const [auth, setAuth] = useState<AuthState>({ status: "idle" });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const existing = window.localStorage.getItem(TOKEN_KEY);
+    const existing = safeGet(TOKEN_KEY);
     if (existing) {
-      const email =
-        window.localStorage.getItem(`${TOKEN_KEY}:email`) ?? "";
+      const email = safeGet(`${TOKEN_KEY}:email`) ?? "";
       setAuth({ status: "authenticated", email });
     }
   }, []);
 
   const handleSignOut = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(TOKEN_KEY);
-      window.localStorage.removeItem(`${TOKEN_KEY}:email`);
-    }
+    safeRemove(TOKEN_KEY);
+    safeRemove(`${TOKEN_KEY}:email`);
     setAuth({ status: "idle" });
+    router.push("/");
   };
 
   if (auth.status === "authenticated") {
@@ -59,12 +59,8 @@ export function ApiTokenSection() {
   const [copied, setCopied] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const existing = window.localStorage.getItem(TOKEN_KEY);
-      if (existing) {
-        setToken(existing);
-      }
-    }
+    const existing = safeGet(TOKEN_KEY);
+    if (existing) setToken(existing);
   }, []);
 
   if (!token) {

@@ -3,14 +3,13 @@
   "name": "Nightstand",
   "description": "Save the current page to your Nightstand weekly reading list.",
   "version": "0.3.0",
-  "permissions": ["storage", "activeTab", "identity"],
+  "permissions": ["storage", "activeTab", "identity", "scripting"],
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
   "action": {
-    "default_title": "Save this page",
-    "default_popup": "popup/popup.html"
+    "default_title": "Save this page"
   },
   "options_page": "options/options.html"
 }

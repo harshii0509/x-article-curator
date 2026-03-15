@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { safeGet } from "@/lib/storage";
 
 type ShareDialogProps = {
   open: boolean;
@@ -28,10 +29,7 @@ export function ShareDialog({ open, onClose, resource }: ShareDialogProps) {
     setError(null);
 
     try {
-      const token =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem("nightstand-api-token")
-          : null;
+      const token = safeGet("nightstand-api-token");
 
       if (!token) {
         setError("You need to sign in to share.");

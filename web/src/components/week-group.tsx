@@ -29,7 +29,7 @@ export function WeekGroup({
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-ns-ink/50">
           {label}
         </h2>
         {shareEnabled ? (

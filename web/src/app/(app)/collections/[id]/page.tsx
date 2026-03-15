@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { LinkCard } from "@/components/link-card";
+import { safeGet } from "@/lib/storage";
 
 type LinkItem = {
   id: number;
@@ -47,10 +48,7 @@ export default function CollectionDetailPage({
   useEffect(() => {
     async function load() {
       try {
-        const token =
-          typeof window !== "undefined"
-            ? window.localStorage.getItem("nightstand-api-token")
-            : null;
+        const token = safeGet("nightstand-api-token");
 
         if (!token) {
           setState({
@@ -100,7 +98,7 @@ export default function CollectionDetailPage({
   if (state.status === "loading") {
     return (
       <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-12">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-ns-ink/50">
           Loading collection…
         </p>
       </main>
@@ -110,12 +108,12 @@ export default function CollectionDetailPage({
   if (state.status === "error" || !state.collection) {
     return (
       <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-12">
-        <p className="text-sm text-red-600 dark:text-red-300">
+        <p className="text-sm text-ns-error">
           {state.error ?? "Collection not found."}
         </p>
         <Link
           href="/collections"
-          className="text-xs text-zinc-500 underline-offset-2 hover:underline dark:text-zinc-400"
+          className="text-xs text-ns-ink/50 underline-offset-2 hover:underline"
         >
           Back to collections
         </Link>
@@ -128,18 +126,18 @@ export default function CollectionDetailPage({
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-12">
       <header className="space-y-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ns-ink/50">
           Collection
         </p>
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="text-lg font-semibold text-ns-ink">
           {collection.title}
         </h1>
         {collection.description ? (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-ns-ink/60">
             {collection.description}
           </p>
         ) : null}
-        <div className="flex items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="flex items-center justify-between gap-3 text-xs text-ns-ink/50">
           <span>
             {links.length} link{links.length === 1 ? "" : "s"}
           </span>

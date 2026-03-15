@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import useSWR from "swr";
 
 import { groupByWeek } from "@/lib/week-utils";
+import { safeGet } from "@/lib/storage";
 import { LinkCard } from "./link-card";
 import { WeekGroup } from "./week-group";
 import { UsernameDialog } from "./username-dialog";
@@ -38,11 +39,7 @@ type WeeksResponse = {
 function useStoredToken(): string | null | undefined {
   const [token, setToken] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    setToken(
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(TOKEN_KEY)
-        : null,
-    );
+    setToken(safeGet(TOKEN_KEY));
   }, []);
   return token;
 }
@@ -62,8 +59,8 @@ export function LinkList() {
   );
 
   useEffect(() => {
-    if (token && typeof window !== "undefined") {
-      const stored = window.localStorage.getItem(USERNAME_KEY);
+    if (token) {
+      const stored = safeGet(USERNAME_KEY);
       if (stored) setUsername(stored || null);
     }
   }, [token]);

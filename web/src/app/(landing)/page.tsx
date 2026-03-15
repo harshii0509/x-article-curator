@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { WaitlistForm } from "./waitlist-form";
+import { LandingSignIn } from "./landing-sign-in";
 import brandLogo from "@/assets/brandLogo.svg";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -60,6 +61,9 @@ export default function LandingPage() {
 
             {/* Waitlist */}
             <WaitlistForm />
+
+            {/* Sign in — opens Google account picker directly (no app login page) */}
+            <LandingSignIn />
           </div>
         </div>
 

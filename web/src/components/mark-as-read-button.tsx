@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { safeGet } from "@/lib/storage";
 
 interface MarkAsReadButtonProps {
   linkId: number;
@@ -14,12 +15,8 @@ export function MarkAsReadButton({ linkId, isRead }: MarkAsReadButtonProps) {
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = window.localStorage.getItem("nightstand-api-token");
-      if (stored) {
-        setToken(stored);
-      }
-    }
+    const stored = safeGet("nightstand-api-token");
+    if (stored) setToken(stored);
   }, []);
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -47,8 +44,8 @@ export function MarkAsReadButton({ linkId, isRead }: MarkAsReadButtonProps) {
   };
 
   const readClasses = isRead
-    ? "border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/40"
-    : "border-zinc-200 text-zinc-500 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800";
+    ? "border-ns-success/50 text-ns-success-deep hover:bg-ns-success-tint"
+    : "border-ns-ink/20 text-ns-ink/60 hover:bg-ns-surface";
 
   return (
     <button

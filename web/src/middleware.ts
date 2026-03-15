@@ -10,12 +10,13 @@ import type { NextRequest } from "next/server";
  *   /api/*         → API routes (including /api/waitlist)
  */
 export function middleware(request: NextRequest) {
-  return NextResponse.redirect(new URL("/", request.url));
+  // Temporarily disabled for testing and development
+  // return NextResponse.redirect(new URL("/", request.url));
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    "/login",
     "/dashboard/:path*",
     "/collections/:path*",
     "/shared/:path*",

@@ -22,7 +22,7 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' https://accounts.google.com",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://accounts.google.com",
       "img-src 'self' https: data:",
       "connect-src 'self' https://accounts.google.com https://www.googleapis.com",
       "frame-src https://accounts.google.com",

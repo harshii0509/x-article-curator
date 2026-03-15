@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { LinkList } from "@/components/link-list";
+import { safeGet } from "@/lib/storage";
 
 const TOKEN_KEY = "nightstand-api-token";
 
@@ -14,11 +15,10 @@ export default function DashboardPage() {
   const [authState, setAuthState] = useState<AuthState>("pending");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = window.localStorage.getItem(TOKEN_KEY);
+    const token = safeGet(TOKEN_KEY);
     if (!token) {
       setAuthState("unauthenticated");
-      router.replace("/login");
+      router.replace("/");
     } else {
       setAuthState("authenticated");
     }
@@ -27,7 +27,7 @@ export default function DashboardPage() {
   if (authState === "pending") {
     return (
       <main className="mx-auto flex max-w-3xl flex-col gap-6">
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-8 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+        <div className="rounded-xl border border-ns-ink/10 bg-ns-surface px-4 py-8 text-center text-sm text-ns-ink/60">
           Loading…
         </div>
       </main>

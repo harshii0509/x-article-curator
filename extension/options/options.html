@@ -51,29 +51,44 @@
   </head>
   <body>
     <h1>Nightstand – Options</h1>
-    <p style="font-size: 13px; color: #4b5563; margin-bottom: 16px">
-      Configure the API endpoint and your personal token from the web app.
+    <p style="font-size: 13px; color: #4b5563; margin-bottom: 8px">
+      Most users don't need to change these. Use "Sign in with Google" in the extension to get started.
+    </p>
+    <p style="font-size: 12px; color: #6b7280; margin-bottom: 16px">
+      Only change API URL or token if you're self-hosting or developing.
     </p>
     <div class="field">
       <label for="api-url">API URL</label>
       <input
         id="api-url"
         type="url"
-        placeholder="https://localhost:3000"
+        placeholder=""
         autocomplete="off"
       />
     </div>
     <div class="field">
-      <label for="api-key">Personal API token</label>
+      <label for="api-key">Personal API token (optional)</label>
       <input
         id="api-key"
         type="text"
-        placeholder="paste from web app"
+        placeholder="optional – paste from web app or sign in via extension"
         autocomplete="off"
       />
     </div>
     <button id="save">Save</button>
     <div id="status" class="status" aria-live="polite"></div>
+
+    <div class="field" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+      <label>Google Sign-In – redirect URI <span style="font-weight: 400; color: #6b7280;">(for developers)</span></label>
+      <p style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">
+        If you see "Error 400: redirect_uri_mismatch" when signing in with Google, add this exact URI in
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>
+        → your OAuth 2.0 Client → Authorized redirect URIs:
+      </p>
+      <input id="redirect-uri" type="text" readonly style="font-size: 12px; background: #f3f4f6;" />
+      <button type="button" id="copy-redirect-uri" style="margin-top: 4px;">Copy redirect URI</button>
+    </div>
+    <script src="config.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

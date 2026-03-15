@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* ─── Nightstand Design System ──────────────────────────────────────────
+   *  bg-ns-bg          → warm cream page background  (#f7f2e8)
+   *  bg-ns-surface     → slightly darker cream (inputs, cards) (#ede5d4)
+   *  text-ns-ink       → dark brown primary text  (#2c1f0e)
+   *  bg-ns-accent      → terracotta CTA / interactive colour (#c9956a)
+   *  text-ns-accent-fg → text colour on accent backgrounds (#f7f2e8)
+   * ──────────────────────────────────────────────────────────────────── */
+  --color-ns-bg: #f7f2e8;
+  --color-ns-surface: #ede5d4;
+  --color-ns-ink: #2c1f0e;
+  --color-ns-accent: #c9956a;
+  --color-ns-accent-fg: #f7f2e8;
+
+  /* Error */
+  --color-ns-error-tint: #fdf0ee;
+  --color-ns-error: #e8604a;
+  --color-ns-error-deep: #7a2e26;
+
+  /* Success */
+  --color-ns-success-tint: #eef3ec;
+  --color-ns-success: #5c8a52;
+  --color-ns-success-deep: #2e4a2a;
+
+  --font-weight-book: 450;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+html {
+  background: var(--color-ns-bg);
+}
+
+body {
+  background: var(--color-ns-bg);
+  color: var(--color-ns-ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}

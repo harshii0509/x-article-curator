@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { safeGet, safeRemove } from "@/lib/storage";
 
 const TOKEN_KEY = "nightstand-api-token";
 
@@ -20,9 +21,7 @@ function NavLink({ href, label }: { href: string; label: string }) {
     <Link
       href={href}
       className={`text-xs font-medium transition-colors ${
-        isActive
-          ? "text-zinc-900 dark:text-zinc-50"
-          : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+        isActive ? "text-ns-ink" : "text-ns-ink/50 hover:text-ns-ink"
       }`}
     >
       {label}
@@ -38,9 +37,8 @@ export function NavBar() {
   }>({ token: null, email: null });
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = window.localStorage.getItem(TOKEN_KEY);
-    const email = window.localStorage.getItem(`${TOKEN_KEY}:email`);
+    const token = safeGet(TOKEN_KEY);
+    const email = safeGet(`${TOKEN_KEY}:email`);
     setAuth({ token, email });
   }, []);
 
@@ -48,20 +46,18 @@ export function NavBar() {
 
   const handleSignOut = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(TOKEN_KEY);
-      window.localStorage.removeItem(`${TOKEN_KEY}:email`);
-      window.localStorage.removeItem(`${TOKEN_KEY}:username`);
-    }
-    router.push("/login");
+    safeRemove(TOKEN_KEY);
+    safeRemove(`${TOKEN_KEY}:email`);
+    safeRemove(`${TOKEN_KEY}:username`);
+    router.push("/");
   };
 
   return (
-    <nav className="sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-950/80">
+    <nav className="sticky top-0 z-50 border-b border-ns-ink/10 bg-ns-bg/80 backdrop-blur-sm">
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-3">
         <Link
           href="/dashboard"
-          className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-50"
+          className="font-newsreader text-sm font-medium tracking-tight text-ns-ink"
         >
           Nightstand
         </Link>
@@ -74,14 +70,14 @@ export function NavBar() {
 
         <div className="flex items-center gap-3">
           {auth.email ? (
-            <span className="hidden text-xs text-zinc-500 dark:text-zinc-400 sm:inline">
+            <span className="hidden text-xs text-ns-ink/50 sm:inline">
               {auth.email}
             </span>
           ) : null}
           <button
             type="button"
             onClick={handleSignOut}
-            className="rounded-full border border-zinc-300 px-3 py-1 text-[11px] font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-full border border-ns-ink/20 px-3 py-1 text-[11px] font-medium text-ns-ink hover:bg-ns-surface"
           >
             Sign out
           </button>

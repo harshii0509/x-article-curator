@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
+import { safeGet } from "@/lib/storage";
 
 const TOKEN_KEY = "nightstand-api-token";
 const USERNAME_KEY = `${TOKEN_KEY}:username`;
@@ -27,11 +28,7 @@ export function ShareWeekButton({
   const handleToggle = async () => {
     if (pending) return;
 
-    const storedUsername =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(USERNAME_KEY)
-        : null;
-
+    const storedUsername = safeGet(USERNAME_KEY);
     const effectiveUsername = username || storedUsername;
 
     if (!effectiveUsername) {
@@ -39,10 +36,7 @@ export function ShareWeekButton({
       return;
     }
 
-    const token =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(TOKEN_KEY)
-        : null;
+    const token = safeGet(TOKEN_KEY);
 
     if (!token) {
       onUsernameRequired();
@@ -82,11 +76,7 @@ export function ShareWeekButton({
   const handleCopy = async () => {
     if (copied) return;
 
-    const storedUsername =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(USERNAME_KEY)
-        : null;
-
+    const storedUsername = safeGet(USERNAME_KEY);
     const effectiveUsername = username || storedUsername;
     if (!effectiveUsername) {
       onUsernameRequired();
@@ -116,8 +106,8 @@ export function ShareWeekButton({
         disabled={pending}
         className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
           isPublic
-            ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-300"
-            : "border-zinc-700 bg-zinc-900 text-zinc-300"
+            ? "border-ns-success/50 bg-ns-success-tint text-ns-success-deep"
+            : "border-ns-ink/20 bg-ns-surface text-ns-ink"
         }`}
       >
         {isPublic ? (
@@ -131,7 +121,7 @@ export function ShareWeekButton({
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 rounded-full border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[11px] font-medium text-zinc-300 hover:bg-zinc-900"
+          className="flex items-center gap-1 rounded-full border border-ns-ink/20 bg-ns-surface px-2 py-0.5 text-[11px] font-medium text-ns-ink hover:bg-ns-bg"
         >
           {copied ? (
             <>
